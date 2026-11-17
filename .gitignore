@@ -1,0 +1,8 @@
+# Power BI files contain production data: never commit them to this public repository
+*.pbix
+*.pbit
+*.abf
+# Local notes with plant figures
+*.local.md
+# Python cache
+__pycache__/

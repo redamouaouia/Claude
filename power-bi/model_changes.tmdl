@@ -1,0 +1,205 @@
+createOrReplace
+
+	ref table 'Inspection Page'
+
+		/// Plant shown in the Plant filter. The QDA source holds a single plant, so this is a constant.
+		/// Replace "ADR" with the name you want users to see.
+		column Plant = "ADR"
+			dataType: string
+			summarizeBy: none
+
+		/// Inspection date without the time (used by the Date filter on every page).
+		column 'Inspection Day' = DATE(YEAR('Inspection Page'[Date]), MONTH('Inspection Page'[Date]), DAY('Inspection Page'[Date]))
+			dataType: dateTime
+			formatString: dd/MM/yyyy
+			summarizeBy: none
+
+		/// First day of the inspection month (axis of "Pass % per month").
+		column 'Inspection Month' = DATE(YEAR('Inspection Page'[Date]), MONTH('Inspection Page'[Date]), 1)
+			dataType: dateTime
+			formatString: MMM yy
+			summarizeBy: none
+
+		/// Time of the last data refresh (calculated columns are recomputed at each refresh).
+		column 'Refreshed At' = NOW()
+			dataType: dateTime
+			isHidden
+			summarizeBy: none
+
+		/// Number of inspections (one result per test on a part).
+		measure Inspections = COUNTROWS('Inspection Page')
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Inspections Pass' =
+				IF(
+					NOT ISBLANK([Inspections]),
+					CALCULATE([Inspections], KEEPFILTERS('Inspection Page'[Test PassFail] = "Pass")) + 0
+				)
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Inspections Fail' =
+				IF(
+					NOT ISBLANK([Inspections]),
+					CALCULATE([Inspections], KEEPFILTERS('Inspection Page'[Test PassFail] = "Fail")) + 0
+				)
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Inspection Pass %' = DIVIDE([Inspections Pass], [Inspections])
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		measure 'Inspection Fail %' = DIVIDE([Inspections Fail], [Inspections])
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		/// Gauge on page 1: last 12 months rolling, follows the Plant filter only.
+		measure 'Inspection Pass % 12M' =
+				CALCULATE(
+					[Inspection Pass %],
+					ALLEXCEPT('Inspection Page', 'Inspection Page'[Plant]),
+					REMOVEFILTERS(Query1),
+					'Inspection Page'[Inspection Day] > EDATE(TODAY(), -12),
+					'Inspection Page'[Inspection Day] <= TODAY()
+				)
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		measure 'Pass % Target' = 0.95
+			formatString: 0%
+			displayFolder: Dashboard
+
+		measure 'Last Refresh' = "Last refresh · " & FORMAT(CALCULATE(MAX('Inspection Page'[Refreshed At]), ALL()), "dd/mm/yyyy hh:nn")
+			displayFolder: Dashboard
+
+	ref table Query1
+
+		/// Measurement date without the time (daily axes on pages 2 and 3).
+		column 'Measurement Day' = DATE(YEAR(Query1[Date]), MONTH(Query1[Date]), DAY(Query1[Date]))
+			dataType: dateTime
+			formatString: dd/MM/yyyy
+			summarizeBy: none
+
+		/// Number of measured values.
+		measure 'Measured Values' = COUNTROWS(Query1)
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Char Pass' =
+				IF(
+					NOT ISBLANK([Measured Values]),
+					CALCULATE([Measured Values], KEEPFILTERS(Query1[Characteristic PassFail] = "Pass")) + 0
+				)
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Char Fail' =
+				IF(
+					NOT ISBLANK([Measured Values]),
+					CALCULATE([Measured Values], KEEPFILTERS(Query1[Characteristic PassFail] = "Fail")) + 0
+				)
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'Char Pass %' = DIVIDE([Char Pass], [Measured Values])
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		measure 'Char Fail %' = DIVIDE([Char Fail], [Measured Values])
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		/// Bar length = number of values, label = share of the bar (Part / Test - Pass & Fail % visuals).
+		measure 'Char Pass Bar' = [Char Pass]
+			displayFolder: Dashboard\Bars
+
+			formatStringDefinition = """" & FORMAT([Char Pass %], "0.0%") & """"
+
+		measure 'Char Fail Bar' = [Char Fail]
+			displayFolder: Dashboard\Bars
+
+			formatStringDefinition = """" & FORMAT([Char Fail %], "0.0%") & """"
+
+		/// Measured values that pass but are outside the reaction (alert) limits (evaluation code -2).
+		measure 'RL Violations' = CALCULATE(COUNTROWS(Query1), KEEPFILTERS(Query1[Is Reaction Limit Violation] = 1))
+			formatString: #,0
+			displayFolder: Dashboard
+
+		measure 'RL Share' = DIVIDE([RL Violations], CALCULATE([RL Violations], ALLSELECTED(Query1[Process Name])))
+			formatString: 0.0%
+			displayFolder: Dashboard
+
+		/// Cpk is counted per characteristic (part + test + characteristic), not per measured value.
+		/// Characteristics without a Cpk value (no USL and no LSL) are left out: the source query marks them "Fail".
+		measure 'Cpk Chars Pass' =
+				COUNTROWS(
+					CALCULATETABLE(
+						SUMMARIZE(Query1, Query1[Part Name], Query1[Process Name], Query1[Characteristic]),
+						KEEPFILTERS(Query1[Cpk Pass/Fail] = "Pass"),
+						KEEPFILTERS(NOT ISBLANK(Query1[Cpk]))
+					)
+				)
+			formatString: #,0
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Chars Fail' =
+				COUNTROWS(
+					CALCULATETABLE(
+						SUMMARIZE(Query1, Query1[Part Name], Query1[Process Name], Query1[Characteristic]),
+						KEEPFILTERS(Query1[Cpk Pass/Fail] = "Fail"),
+						KEEPFILTERS(NOT ISBLANK(Query1[Cpk]))
+					)
+				)
+			formatString: #,0
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Chars' = [Cpk Chars Pass] + [Cpk Chars Fail]
+			formatString: #,0
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Char Pass %' = DIVIDE([Cpk Chars Pass], [Cpk Chars])
+			formatString: 0.0%
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Char Fail %' = DIVIDE([Cpk Chars Fail], [Cpk Chars])
+			formatString: 0.0%
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Chars Pass Bar' = [Cpk Chars Pass]
+			displayFolder: Dashboard\Bars
+
+			formatStringDefinition = """" & FORMAT([Cpk Char Pass %], "0.0%") & """"
+
+		measure 'Cpk Chars Fail Bar' = [Cpk Chars Fail]
+			displayFolder: Dashboard\Bars
+
+			formatStringDefinition = """" & FORMAT([Cpk Char Fail %], "0.0%") & """"
+
+		measure 'Cpk Value' = MAX(Query1[Cpk])
+			formatString: 0.00
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Threshold Value' = MAX(Query1[Cpk Threshold])
+			formatString: 0.00
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Status' =
+				VAR _cpk = [Cpk Value]
+				VAR _threshold = [Cpk Threshold Value]
+				RETURN
+					IF(
+						NOT ISBLANK(_cpk) && NOT ISBLANK(_threshold),
+						IF(_cpk >= _threshold, "✔ Pass", "✖ Fail")
+					)
+			displayFolder: Dashboard\Cpk
+
+		measure 'Cpk Status Color' = SWITCH([Cpk Status], "✔ Pass", "#2F6EBA", "✖ Fail", "#ED7D31")
+			displayFolder: Dashboard\Cpk
+
+	relationship 518d4574-cd89-3435-d44c-5219426865e9
+		crossFilteringBehavior: bothDirections
+		fromColumn: Query1.'Inspection Number'
+		toColumn: 'Inspection Page'.'Inspection Number'
+
