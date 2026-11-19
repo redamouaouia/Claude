@@ -140,6 +140,57 @@ def button_objects(text=None, fill=None, fill_transp=0, text_color=NAVY, size=10
     return o
 
 
+# --------------------------------------------------------------------------- buttons = look + click area
+# In this Power BI Desktop version, action buttons written from file only drew their border: fill and label
+# did not show (except one button). Text boxes with a rounded background render reliably, and invisible
+# buttons stay clickable. So every visible button is now a styled text box ("look") under a transparent
+# button that carries the action; bookmarks show and hide both together.
+LOOKS = {}  # button name -> look of its twin text box (filled per page)
+
+
+def hotspot(vis):
+    link = vis["visualContainerObjects"].get("visualLink")
+    vis["objects"] = button_objects()
+    vis["visualContainerObjects"] = vco_plain({"visualLink": link} if link else None)
+
+
+def look(name, text, bg, fg, size=10, bold=True, radius=16, pad_top=6, bg_transp=0, border=True):
+    LOOKS[name] = dict(text=text, bg=bg, fg=fg, size=size, bold=bold, radius=radius, pad_top=pad_top,
+                       bg_transp=bg_transp, border=border)
+
+
+def twin_textbox(btn, lk):
+    pos = dict(btn["position"])
+    pos["z"] = pos["z"] - 1
+    pos["tabOrder"] = pos["z"]
+    style = {"fontFamily": "Segoe UI Semibold" if lk["bold"] else "Segoe UI", "fontSize": f"{lk['size']}pt",
+             "color": lk["fg"]}
+    if lk["bold"]:
+        style["fontWeight"] = "bold"
+    t = {
+        "$schema": btn["$schema"],
+        "name": secrets.token_hex(10),
+        "position": pos,
+        "visual": {
+            "visualType": "textbox",
+            "objects": {"general": [P(paragraphs=[{"textRuns": [{"value": lk["text"], "textStyle": style}],
+                                                   "horizontalTextAlignment": "center"}])]},
+            "visualContainerObjects": {
+                "background": [P(show=B(True), color=C(lk["bg"]), transparency=N(lk["bg_transp"]))],
+                "border": [P(show=B(lk["border"]), color=C(lk["bg"]), radius=N(lk["radius"]), width=N(1))],
+                "dropShadow": [P(show=B(False))],
+                "title": [P(show=B(False))],
+                "visualHeader": [P(show=B(False))],
+                "padding": [P(top=N(lk["pad_top"]), bottom=N(0), left=N(2), right=N(2))],
+            },
+            "drillFilterOtherVisuals": True,
+        },
+    }
+    if btn.get("isHidden"):
+        t["isHidden"] = True
+    return t
+
+
 # --------------------------------------------------------------------------- reading the input report
 def text_of(v):
     try:
@@ -276,11 +327,8 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             }
         elif slot == "more":
             place(v, more_x, D.SLICER_Y, more_w, D.SLICER_H)
-            link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects(f"More filters · {spec['more_count']}", fill=WHITE, fill_transp=0,
-                                            text_color=NAVY, size=9, bold=True, shape="pill",
-                                            hover=("#E3EBF6", 0), hmargin=4)
-            vis["visualContainerObjects"] = vco_plain({"visualLink": link})
+            hotspot(vis)
+            look(name, f"More filters · {spec['more_count']}", WHITE, NAVY, size=9, radius=18, pad_top=8)
 
         # ---- page 1
         elif slot == "gauge":
@@ -363,13 +411,10 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             x, y, w, h = cards["table"]
             bx = x + w - 112 if label == "Part" else x + w - 58
             place(v, bx, y + 13, 52, 24)
-            link = vis["visualContainerObjects"].get("visualLink")
-            if state == "on":
-                vis["objects"] = button_objects(label, fill=NAVY, text_color=WHITE, size=9, bold=True, shape="pill")
-            else:
-                vis["objects"] = button_objects(label, fill="#EEF2F8", text_color=NAVY, size=9, shape="pill",
-                                                hover=("#DDE6F2", 0))
-            vis["visualContainerObjects"] = vco_plain({"visualLink": link} if link else None)
+            hotspot(vis)
+            on = state == "on"
+            look(name, label, NAVY if on else "#EEF2F8", WHITE if on else NAVY, size=9, bold=on, radius=12,
+                 pad_top=3)
 
         # ---- page 2
         elif slot.startswith("kpi:"):
@@ -434,9 +479,8 @@ def restyle_page(page_key, visuals, new_visuals, removed):
 
         # ---- "More filters" panel (positions unchanged, refreshed look)
         elif slot == "overlay":
-            link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects(fill=NAVY_DEEP, fill_transp=42, shape="rectangle", radius=0)
-            vis["visualContainerObjects"] = vco_plain({"visualLink": link})
+            hotspot(vis)
+            look(name, "", NAVY_DEEP, WHITE, radius=0, pad_top=0, bg_transp=42, border=False)
         elif slot == "panel_bg":
             vis["visualContainerObjects"] = vco_plain({
                 "background": [P(show=B(True), color=C(WHITE), transparency=N(0))],
@@ -457,16 +501,12 @@ def restyle_page(page_key, visuals, new_visuals, removed):
                                             size=10, bold=True, shape="pill", hover=("#DDE6F2", 0))
             vis["visualContainerObjects"] = vco_plain({"visualLink": link})
         elif slot == "panel_close":
-            link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects("Close", fill=NAVY, text_color=WHITE, size=10, bold=True, shape="pill",
-                                            hover=("#123E80", 0))
-            vis["visualContainerObjects"] = vco_plain({"visualLink": link})
+            hotspot(vis)
+            look(name, "Close", NAVY, WHITE, size=10, radius=16, pad_top=6)
         elif slot == "panel_x":
-            link = vis["visualContainerObjects"].get("visualLink")
             v["position"].update({"x": 1234, "y": 12, "width": 30, "height": 30})
-            vis["objects"] = button_objects("✕", fill=NAVY, text_color=WHITE, size=11, bold=True, shape="oval",
-                                            hover=("#123E80", 0))
-            vis["visualContainerObjects"] = vco_plain({"visualLink": link})
+            hotspot(vis)
+            look(name, "✕", NAVY, WHITE, size=10, radius=15, pad_top=5)
         else:
             raise SystemExit(f"unhandled visual {name}: {slot}")
 
@@ -583,6 +623,7 @@ def main(src, dst):
 
     out_defs = {k: v for k, v in defs.items() if "/visuals/" not in k}
     all_pages = {}
+    twins = {}
     images = {}
     for key, pid in page_keys.items():
         visuals = {}
@@ -592,7 +633,12 @@ def main(src, dst):
                 v["_slot"] = classify(v, page_names)
                 visuals[v["name"]] = v
         new_visuals, removed = {}, []
+        LOOKS.clear()
         restyle_page(key, visuals, new_visuals, removed)
+        for bname, lk in LOOKS.items():
+            t = twin_textbox(visuals[bname], lk)
+            new_visuals[t["name"]] = t
+            twins[bname] = t["name"]
         for n in removed:
             visuals.pop(n)
         visuals.update(new_visuals)
@@ -619,6 +665,19 @@ def main(src, dst):
     report["resourcePackages"] = [p for p in report["resourcePackages"] if p["name"] != "RegisteredResources"] + [
         {"name": "RegisteredResources", "type": "RegisteredResources",
          "items": [{"name": n, "path": n, "type": "Image"} for n in images]}]
+
+    for k, bm in out_defs.items():
+        if k.startswith("bookmarks/") and k.endswith(".bookmark.json"):
+            names = bm["options"].get("targetVisualNames", [])
+            for sec in bm["explorationState"]["sections"].values():
+                vcs = sec.get("visualContainers", {})
+                for n in list(vcs):
+                    if n in twins:
+                        entry = copy.deepcopy(vcs[n])
+                        entry["singleVisual"]["visualType"] = "textbox"
+                        entry["singleVisual"]["objects"] = {}
+                        vcs[twins[n]] = entry
+            bm["options"]["targetVisualNames"] = names + [twins[n] for n in names if n in twins]
 
     problems = check_capabilities(all_pages)
     bookmark_targets = set()
