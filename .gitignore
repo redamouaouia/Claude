@@ -6,3 +6,8 @@
 *.local.md
 # Python cache
 __pycache__/
+# Local connection settings and generated outputs
+*.local.json
+power-bi/**/out/
+power-bi/**/bin/
+power-bi/**/obj/
