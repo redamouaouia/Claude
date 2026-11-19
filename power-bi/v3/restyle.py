@@ -126,9 +126,12 @@ def button_objects(text=None, fill=None, fill_transp=0, text_color=NAVY, size=10
                       "leftMargin": I(hmargin), "rightMargin": I(hmargin)}, DEFAULT)],
         "fill": [SEL({"show": B(fill is not None), "fillColor": C(fill or WHITE), "transparency": N(fill_transp)},
                      DEFAULT)],
-        "outline": [SEL({"show": B(outline is not None), "lineColor": C(outline or WHITE),
-                         "transparency": N(outline_transp if outline else 100), "weight": N(1 if outline else 0)},
-                        DEFAULT)],
+        # Power BI Desktop does not draw a button (fill, text) whose border is switched off with a 0 width,
+        # as seen on screen: "Reset" (border on) showed, "Close" (border off) did not. Visible buttons therefore
+        # always keep a 1 px border, in the fill colour when no border is wanted.
+        "outline": [SEL({"show": B(True), "lineColor": C(outline or fill or WHITE),
+                         "transparency": N(outline_transp if outline else (fill_transp if fill else 100)),
+                         "weight": N(1)}, DEFAULT)],
         "shape": [SEL({"tileShape": S(shape), "roundEdge": I(radius)}, DEFAULT)],
     }
     if hover:
