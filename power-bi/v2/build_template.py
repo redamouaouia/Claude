@@ -153,7 +153,10 @@ def tmdl_expr(text, indent):
     return "", [pad + line for line in text.split("\n")]
 
 
-def write_model(out, settings):
+def write_model(out, settings, source_m=None, columns=None):
+    """TMDL model in out/model. source_m / columns replace the Quality Tracker query and column list (variants)."""
+    source_m = source_m or m_source()
+    columns = columns or COLUMNS
     model_dir = out / "model"
     if model_dir.exists():
         shutil.rmtree(model_dir)
@@ -194,7 +197,7 @@ def write_model(out, settings):
         if dyn:
             lines += ["", f"\t\tformatStringDefinition = {dyn}"]
         lines.append("")
-    for name, dtype, _, hidden, fmt in COLUMNS:
+    for name, dtype, _, hidden, fmt in columns:
         lines.append(f"\tcolumn {tmdl_name(name)}")
         lines.append(f"\t\tdataType: {dtype}")
         if fmt:
@@ -206,7 +209,7 @@ def write_model(out, settings):
         if dtype == "dateTime" and fmt and "y" in fmt:
             lines[-1:-1] = ["\t\tannotation UnderlyingDateTimeDataType = Date", ""]
     lines += [f"\tpartition {tmdl_name(T)} = m", "\t\tmode: import", "\t\tsource ="]
-    lines += ["\t\t\t\t" + x for x in m_source().split("\n")]
+    lines += ["\t\t\t\t" + x for x in source_m.split("\n")]
     lines += ["", "\tannotation PBI_ResultType = Table", ""]
     (model_dir / "tables" / f"{T}.tmdl").write_text("\n".join(lines) + "\n")
 
@@ -438,12 +441,8 @@ CONTENT_TYPES = ('﻿<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://
                  '/></Types>')
 
 
-def main(src_pbix, settings_path):
-    settings = json.loads(pathlib.Path(settings_path).read_text())
-    out = HERE / "out"
-    out.mkdir(exist_ok=True)
-    model_dir = write_model(out, settings)
-    schema = out / "DataModelSchema.json"
+def model_schema(model_dir, schema):
+    """Validates the TMDL folder with Microsoft's Tabular Object Model and writes the DataModelSchema (TMSL)."""
     tool = HERE / "tools" / "tmdl2json"
     run_ = subprocess.run(["dotnet", "run", "-c", "Release", "--project", str(tool), "--", str(model_dir), str(schema)],
                           capture_output=True, text=True, env={**__import__("os").environ,
@@ -453,21 +452,33 @@ def main(src_pbix, settings_path):
     if run_.returncode != 0:
         print(run_.stderr[-3000:])
         sys.exit("model conversion failed")
+    return json.loads(schema.read_bytes().decode("utf-16-le"))
 
-    zin = zipfile.ZipFile(src_pbix)
-    orig_layout = json.loads(zin.read("Report/Layout").decode("utf-16-le"))
-    bookmarks = []
-    layout = build_layout(orig_layout, bookmarks)
 
-    model_json = json.loads(schema.read_bytes().decode("utf-16-le"))
+def diagram_layout(model_json):
     tags = {t["name"]: t.get("lineageTag") for t in model_json["model"]["tables"]}
-    diagram = {"version": "1.1.0", "diagrams": [{
+    return {"version": "1.1.0", "diagrams": [{
         "ordinal": 0, "scrollPosition": {"x": 0, "y": 0},
         "nodes": [{"location": {"x": 40 + 300 * i, "y": 40}, "nodeIndex": name, "nodeLineageTag": tag,
                    "size": {"height": 300, "width": 234}, "zIndex": 0} for i, (name, tag) in enumerate(tags.items())],
         "name": "All tables", "zoomValue": 100, "pinKeyFieldsToTop": False, "showExtraHeaderInfo": False,
         "hideKeyFieldsWhenCollapsed": False, "tablesLocked": False}],
         "selectedDiagram": "All tables", "defaultDiagram": "All tables"}
+
+
+def main(src_pbix, settings_path):
+    settings = json.loads(pathlib.Path(settings_path).read_text())
+    out = HERE / "out"
+    out.mkdir(exist_ok=True)
+    model_dir = write_model(out, settings)
+    schema = out / "DataModelSchema.json"
+    model_json = model_schema(model_dir, schema)
+
+    zin = zipfile.ZipFile(src_pbix)
+    orig_layout = json.loads(zin.read("Report/Layout").decode("utf-16-le"))
+    bookmarks = []
+    layout = build_layout(orig_layout, bookmarks)
+    diagram = diagram_layout(model_json)
 
     theme = "Report/StaticResources/SharedResources/BaseThemes/CY26SU02.json"
     dst = out / "Quality_Dashboard_V2.pbit"

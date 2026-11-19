@@ -31,3 +31,25 @@ Même rapport que la V2 : même table Databricks, mêmes mesures, mêmes filtres
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
 (`@microsoft/powerbi-core-visual-schema`). Il vérifie aussi que chaque visuel ciblé par un signet existe toujours.
 La géométrie est définie une seule fois, dans `design.py`, et partagée par le fond de page et les visuels.
+
+## Variante Power Query (pour comparer)
+
+`build_pq_template.py` produit `out/Quality_Dashboard_V3_PQ.pbit`, avec le même rapport et les mêmes mesures.
+La requête Quality Tracker ne contient plus de SQL écrit à la main : elle lit la table avec le navigateur
+Databricks, et chaque règle de la version SQL devient une étape Power Query.
+
+| Étapes | Rôle |
+|---|---|
+| `Keep 15 columns`, `Filter period`, `Sort rows` | Power Query les traduit lui-même en requête Databricks (*query folding*). Sans cela, chaque actualisation téléchargerait toute la table. |
+| `Stop folding` | Tout ce qui suit est calculé par Power BI, et non par Databricks. |
+| `Add Month` … `Add RL Violation` | Les mêmes règles que la requête SQL, une étape par règle. |
+
+Seule différence de modèle : `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que
+la version SQL le réduit à un entier avec `xxhash64`. Les noms de colonnes ne changent pas : le rapport n'est pas modifié.
+
+```bash
+python build_pq_template.py <V3.pbix> --range 2025-01-01 2030-01-01
+```
+
+Le script reconstruit le modèle et le valide avec la bibliothèque Microsoft Tabular Object Model. Il vérifie aussi
+que chaque champ utilisé par le rapport existe dans le modèle. `--range` préremplit `RangeStart` et `RangeEnd`.
