@@ -24,7 +24,7 @@ T = "Quality Tracker"
 NAVY, NAVY_DEEP, WHITE = "#0B2A5B", "#061A3C", "#FFFFFF"
 BLUE, ORANGE = "#2F6EBA", "#ED7D31"
 TEXT, MUTED, MUTED2, LINE = "#1B2A41", "#5A6B85", "#7A889C", "#E8EDF4"
-NUM_FONT = "DIN"
+NUM_FONT = "Segoe UI Semibold"
 
 
 # --------------------------------------------------------------------------- PBIR literal helpers
@@ -89,6 +89,7 @@ def vco_card(title=None, subtitle=None, bg=True, pad=(12, 10, 16, 16), header=Tr
         "padding": [P(top=N(pad[0]), bottom=N(pad[1]), left=N(pad[2]), right=N(pad[3]))],
         "visualHeader": [P(show=B(header), foreground=C(MUTED), background=C(WHITE), border=C(WHITE),
                            transparency=N(0))],
+        "general": [P(keepLayerOrder=B(True))],
     }
     if title:
         v["title"] = [P(show=B(True), text=S(title), fontColor=C(NAVY), fontSize=N(12),
@@ -116,16 +117,18 @@ def vco_plain(extra=None):
 
 
 def button_objects(text=None, fill=None, fill_transp=0, text_color=NAVY, size=10, bold=False, outline=None,
-                   outline_transp=0, shape="rectangleRounded", radius=8, hover=None, align="center"):
+                   outline_transp=0, shape="rectangleRounded", radius=8, hover=None, align="center", hmargin=6):
     o = {
         "icon": [SEL({"shapeType": S("blank")}, DEFAULT)],
         "text": [SEL({"show": B(bool(text)), "text": S(text or ""), "fontColor": C(text_color), "fontSize": N(size),
                       "fontFamily": S("Segoe UI Semibold" if bold else "Segoe UI"), "horizontalAlignment": S(align),
-                      "verticalAlignment": S("middle")}, DEFAULT)],
+                      "verticalAlignment": S("middle"), "topMargin": I(0), "bottomMargin": I(0),
+                      "leftMargin": I(hmargin), "rightMargin": I(hmargin)}, DEFAULT)],
         "fill": [SEL({"show": B(fill is not None), "fillColor": C(fill or WHITE), "transparency": N(fill_transp)},
                      DEFAULT)],
         "outline": [SEL({"show": B(outline is not None), "lineColor": C(outline or WHITE),
-                         "transparency": N(outline_transp), "weight": N(1)}, DEFAULT)],
+                         "transparency": N(outline_transp if outline else 100), "weight": N(1 if outline else 0)},
+                        DEFAULT)],
         "shape": [SEL({"tileShape": S(shape), "roundEdge": I(radius)}, DEFAULT)],
     }
     if hover:
@@ -266,19 +269,20 @@ def restyle_page(page_key, visuals, new_visuals, removed):
                 "title": [P(show=B(False))],
                 "visualHeader": [P(show=B(False))],
                 "padding": [P(top=N(0), bottom=N(0), left=N(4), right=N(4))],
+                "general": [P(keepLayerOrder=B(True))],
             }
         elif slot == "more":
             place(v, more_x, D.SLICER_Y, more_w, D.SLICER_H)
             link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects(f"More filters · {spec['more_count']}", fill=WHITE, fill_transp=88,
-                                            text_color=WHITE, size=10, bold=True, outline=WHITE, outline_transp=55,
-                                            shape="pill", hover=(WHITE, 78))
+            vis["objects"] = button_objects(f"More filters · {spec['more_count']}", fill=WHITE, fill_transp=0,
+                                            text_color=NAVY, size=9, bold=True, shape="pill",
+                                            hover=("#E3EBF6", 0), hmargin=4)
             vis["visualContainerObjects"] = vco_plain({"visualLink": link})
 
         # ---- page 1
         elif slot == "gauge":
             x, y, w, h = cards["hero"]
-            place(v, x + 14, y + 108, w - 28, h - 116)
+            place(v, x + 14, y + 128, w - 28, h - 134)
             vis["objects"] = {
                 "axis": [P(min=N(0), max=N(1))],
                 "dataPoint": [P(fill=C(BLUE), target=C(NAVY))],
@@ -286,9 +290,9 @@ def restyle_page(page_key, visuals, new_visuals, removed):
                 "labels": [P(show=B(True), color=C(MUTED2), fontSize=N(8), fontFamily=S("Segoe UI"))],
                 "target": [P(show=B(True), color=C(NAVY), fontSize=N(8), fontFamily=S("Segoe UI Semibold"))],
             }
-            vis["visualContainerObjects"] = vco_plain({"visualHeader": [P(show=B(False))]})
-            hero = new_cardvisual(v, "Inspection Pass % 12M", "Pass rate", (x, y, w, 108), title="Pass rate",
-                                  subtitle="Rolling 12 months · follows the Plant filter only", size=30,
+            vis["visualContainerObjects"] = vco_plain({"general": [P(keepLayerOrder=B(True))]})
+            hero = new_cardvisual(v, "Inspection Pass % 12M", "Pass rate", (x, y, w, 130), title="Pass rate",
+                                  subtitle="Last 12 months · Plant filter only", size=28,
                                   color=BLUE, label="Target 95 %")
             new_visuals[hero["name"]] = hero
         elif slot == "lineChart" and page_key == "overview":
@@ -328,11 +332,6 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             o["labels"] = [P(show=B(True), labelStyle=S("Category, percent of total"), position=S("outside"),
                              fontSize=N(9), color=C(TEXT), percentageLabelPrecision=I(1), overflow=B(True))]
             o["legend"] = [P(show=B(False))]
-            o["centerValue"] = [P(show=B(True))]
-            o["value"] = [P(show=B(True), value=measure_expr("Inspection Pass %"), fontFamily=S(NUM_FONT),
-                            fontSize=N(20), fontColor=C(BLUE), labelPrecision=I(1))]
-            o["label"] = [P(show=B(True), text=S("Pass rate"), fontSize=N(9), fontColor=C(MUTED),
-                            fontFamily=S("Segoe UI"))]
             vis["visualContainerObjects"] = vco_card("Pass & Fail %", "Inspections in the selected period")
         elif slot == "decompositionTreeVisual":
             place(v, *cards["decomp"])
@@ -340,7 +339,7 @@ def restyle_page(page_key, visuals, new_visuals, removed):
                 "dataBars": [P(positiveBarColor=C(ORANGE), dataBarColor=C(ORANGE),
                                dataBarBackgroundColor=C("#F3F5F9"))],
                 "tree": [P(accentColor=C(NAVY), connectorDefaultColor=C("#C9D3E0"), connectorType=S("curve"),
-                           density=S("default"))],
+                           density=S("default"), responsiveLayout=B(True))],
                 "categoryLabels": [P(categoryLabelFontColor=C(TEXT), categoryLabelFontSize=N(9),
                                      categoryLabelFontFamily=S("Segoe UI"))],
                 "dataLabels": [P(dataLabelFontColor=C(NAVY), dataLabelFontSize=N(9), dataLabelBold=B(True),
@@ -355,12 +354,12 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             place(v, *cards["table"])
             style_table(vis)
             what = "test" if slot.endswith("Test") else "part"
-            vis["visualContainerObjects"] = vco_card(f"Results per {what}", f"Pass and fail by {what} · switch with Part | Test")
+            vis["visualContainerObjects"] = vco_card(f"Results per {what}", f"Pass and fail by {what}")
         elif slot.startswith("toggle:"):
             _, label, state = slot.split(":")
             x, y, w, h = cards["table"]
             bx = x + w - 112 if label == "Part" else x + w - 58
-            place(v, bx, y + 14, 52, 22)
+            place(v, bx, y + 13, 52, 24)
             link = vis["visualContainerObjects"].get("visualLink")
             if state == "on":
                 vis["objects"] = button_objects(label, fill=NAVY, text_color=WHITE, size=9, bold=True, shape="pill")
@@ -375,10 +374,10 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             first = measure == "Char Pass %"
             place(v, *cards["kpi1" if first else "kpi2"])
             vis["objects"] = {
-                "value": [SEL({"fontColor": C(BLUE if first else NAVY), "fontSize": N(26), "fontFamily": S(NUM_FONT),
+                "value": [SEL({"fontColor": C(BLUE if first else NAVY), "fontSize": N(24), "fontFamily": S(NUM_FONT),
                                "horizontalAlignment": S("left")}, DEFAULT)],
                 "label": [SEL({"show": B(False)}, DEFAULT)],
-                "fillCustom": [SEL({"show": B(False)}, DEFAULT)],
+                **CARD_CLEAN,
                 "trendVisualLibrary": [SEL({"show": B(True), "chartType": S("line"), "includePrimaryMeasure": B(True),
                                             "legendShow": B(False), "showTooltip": B(True)}, DEFAULT)],
                 "lineTrendVisual": [SEL({"lineColor": C(BLUE if first else NAVY), "lineWidth": N(2),
@@ -388,9 +387,8 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             }
             vis["query"]["queryState"]["TrendVisualCategory"] = {
                 "projections": [projection("Column", "Date", "Date", active=True)]}
-            title, sub = (("Characteristic pass %", "Evaluated values · trend per day") if first
-                          else ("Measured values", "All values in the period · trend per day"))
-            vis["visualContainerObjects"] = vco_card(title, sub, pad=(12, 8, 16, 16))
+            title = "Characteristic pass % · per day" if first else "Measured values · per day"
+            vis["visualContainerObjects"] = vco_card(title, None, pad=(10, 6, 16, 16))
         elif slot == "lineChart":
             place(v, *cards["line"])
             q = vis["query"]["queryState"]
@@ -422,7 +420,7 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             o["legend"] = [P(show=B(True), position=S("TopRight"), showTitle=B(False), fontSize=N(9),
                              labelColor=C(TEXT))]
             o["categoryAxis"] = [P(show=B(True), showAxisTitle=B(False), fontSize=N(9), labelColor=C(TEXT),
-                                   innerPadding=I(34))]
+                                   innerPadding=I(34), maxMarginFactor=I(40 if what == "part" else 36))]
             vis["visualContainerObjects"] = vco_card(f"{what.capitalize()} – Pass & Fail %",
                                                      "Share of evaluated values · bar length = volume")
         elif slot.startswith("table:"):
@@ -452,8 +450,8 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             vis["visualContainerObjects"] = vco_plain()
         elif slot == "panel_reset":
             link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects("Reset", outline=NAVY, text_color=NAVY, size=10, bold=True, shape="pill",
-                                            hover=("#EEF2F8", 0))
+            vis["objects"] = button_objects("Reset", fill="#EEF2F8", outline=NAVY, outline_transp=60, text_color=NAVY,
+                                            size=10, bold=True, shape="pill", hover=("#DDE6F2", 0))
             vis["visualContainerObjects"] = vco_plain({"visualLink": link})
         elif slot == "panel_close":
             link = vis["visualContainerObjects"].get("visualLink")
@@ -462,7 +460,9 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             vis["visualContainerObjects"] = vco_plain({"visualLink": link})
         elif slot == "panel_x":
             link = vis["visualContainerObjects"].get("visualLink")
-            vis["objects"] = button_objects("✕", text_color=MUTED, size=12, shape="oval", hover=("#EEF2F8", 0))
+            v["position"].update({"x": 1234, "y": 12, "width": 30, "height": 30})
+            vis["objects"] = button_objects("✕", fill=NAVY, text_color=WHITE, size=11, bold=True, shape="oval",
+                                            hover=("#123E80", 0))
             vis["visualContainerObjects"] = vco_plain({"visualLink": link})
         else:
             raise SystemExit(f"unhandled visual {name}: {slot}")
@@ -473,10 +473,21 @@ def style_table(vis):
     o["columnHeaders"] = [P(fontColor=C(MUTED2), fontSize=N(9), fontFamily=S("Segoe UI Semibold"),
                             backColor=C(WHITE), wordWrap=B(True))]
     o["values"] = [P(fontSize=N(10), fontFamily=S("Segoe UI"), fontColorPrimary=C(TEXT), fontColorSecondary=C(TEXT),
-                     backColorPrimary=C(WHITE), backColorSecondary=C("#FAFBFD"))] + \
+                     backColorPrimary=C(WHITE), backColorSecondary=C("#FAFBFD"), wordWrap=B(True))] + \
         [x for x in o.get("values", []) if "selector" in x]
     o["grid"] = [P(gridVertical=B(False), gridHorizontal=B(True), gridHorizontalColor=C("#EEF2F7"),
                    outlineColor=C(LINE), outlineWeight=N(1), rowPadding=N(6))]
+
+
+CARD_CLEAN = {  # new card visual: remove the default tile border, outline, accent bar and callout background
+    "fillCustom": [SEL({"show": B(False)}, DEFAULT)],
+    "outline": [SEL({"show": B(False)}, DEFAULT)],
+    "border": [SEL({"show": B(False)}, DEFAULT)],
+    "accentBar": [SEL({"show": B(False)}, DEFAULT)],
+    "shadowCustom": [SEL({"show": B(False)}, DEFAULT)],
+    "glowCustom": [SEL({"show": B(False)}, DEFAULT)],
+    "cardCalloutArea": [SEL({"show": B(False)}, DEFAULT)],
+}
 
 
 def new_cardvisual(like, measure, display, rect, title, subtitle, size, color, label):
@@ -494,10 +505,8 @@ def new_cardvisual(like, measure, display, rect, title, subtitle, size, color, l
             "objects": {
                 "value": [SEL({"fontColor": C(color), "fontSize": N(size), "fontFamily": S(NUM_FONT),
                                "horizontalAlignment": S("left")}, DEFAULT)],
-                "label": [SEL({"show": B(True), "text": S(label), "fontColor": C(MUTED), "fontSize": N(9.5),
-                               "fontFamily": S("Segoe UI"), "position": S("belowValue"),
-                               "horizontalAlignment": S("left")}, DEFAULT)],
-                "fillCustom": [SEL({"show": B(False)}, DEFAULT)],
+                "label": [SEL({"show": B(False)}, DEFAULT)],
+                **CARD_CLEAN,
             },
             "visualContainerObjects": vco_card(title, subtitle, pad=(12, 2, 16, 16), header=False),
             "drillFilterOtherVisuals": True,
@@ -506,6 +515,14 @@ def new_cardvisual(like, measure, display, rect, title, subtitle, size, color, l
 
 
 # --------------------------------------------------------------------------- capability check
+def enum_values(spec):
+    t = spec.get("type", {}) if isinstance(spec, dict) else {}
+    e = t.get("enumeration") if isinstance(t, dict) else None
+    if isinstance(e, dict):
+        e = e.get("allMembers", [])
+    return {str(x.get("value")) for x in e} if isinstance(e, list) else None
+
+
 def check_capabilities(pages):
     cat_dir = pathlib.Path(os.environ.get("PBI_VISUAL_SCHEMA_DIR", ""))
     cap = json.loads((cat_dir / "capabilities.json").read_text())
@@ -520,9 +537,16 @@ def check_capabilities(pages):
                     problems.append(f"{page}/{vt}: unknown object '{on}'")
                     continue
                 for e in entries:
-                    for pn in e.get("properties", {}):
-                        if pn not in objs[on].get("properties", {}):
+                    for pn, val in e.get("properties", {}).items():
+                        spec = objs[on].get("properties", {}).get(pn)
+                        if spec is None:
                             problems.append(f"{page}/{vt}: unknown property '{on}.{pn}'")
+                            continue
+                        allowed = enum_values(spec)
+                        lit_val = val.get("expr", {}).get("Literal", {}).get("Value") if isinstance(val, dict) else None
+                        if allowed and isinstance(lit_val, str) and lit_val.startswith("'"):
+                            if lit_val.strip("'") not in allowed:
+                                problems.append(f"{page}/{vt}: '{on}.{pn}' = {lit_val} not in {allowed}")
             for on, entries in v["visual"].get("visualContainerObjects", {}).items():
                 props = vco.get(on, {}).get("properties", vco.get(on, {}))
                 if on not in vco:

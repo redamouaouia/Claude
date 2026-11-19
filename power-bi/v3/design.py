@@ -11,15 +11,16 @@ W, H = 1280, 720
 RAIL_W = 96
 X0, X1 = 124, 1256
 BAND_H = 184
-LABEL_Y, SLICER_Y, SLICER_H = 92, 106, 32
-ROW2_Y, ROW2_H = 156, 240
-ROW3_Y, ROW3_H = 410, 290
+LABEL_Y, SLICER_Y, SLICER_H = 91, 104, 36
+ROW2_Y, ROW2_H = 156, 254
+ROW3_Y, ROW3_H = 424, 280
 GAP = 16
 
 NAV = [("Overview", "overview"), ("Characteristics", "chars")]
 NAV_TILES = {k: (10, 96 + i * 74, 76, 64) for i, (_, k) in enumerate(NAV)}
 CLEAR_TILE = (10, 636, 76, 64)
-REFRESH_PILL = (1010, 22, 246, 26)
+REFRESH_PILL = (966, 22, 290, 26)
+DATE_W, MORE_W = 250, 132  # fixed widths: two date boxes, and the full "More filters · N" label
 
 
 def distribute(weights, x0=X0, x1=X1, gap=10):
@@ -43,8 +44,8 @@ PAGES = {
             "hero": (X0, ROW2_Y, 300, ROW2_H),
             "line": (440, ROW2_Y, 500, ROW2_H),
             "donut": (956, ROW2_Y, 300, ROW2_H),
-            "decomp": (X0, ROW3_Y, 692, ROW3_H),
-            "table": (832, ROW3_Y, 424, ROW3_H),
+            "decomp": (X0, ROW3_Y, 760, ROW3_H),
+            "table": (900, ROW3_Y, 356, ROW3_H),
         },
     },
     "chars": {
@@ -55,8 +56,8 @@ PAGES = {
                     ("Date", "Date", 1.4)],
         "more_count": 2,
         "cards": {
-            "kpi1": (X0, ROW2_Y, 300, 113),
-            "kpi2": (X0, ROW2_Y + 127, 300, 113),
+            "kpi1": (X0, ROW2_Y, 300, 121),
+            "kpi2": (X0, ROW2_Y + 133, 300, 121),
             "line": (440, ROW2_Y, 816, ROW2_H),
             "bars_part": (X0, ROW3_Y, 364, ROW3_H),
             "bars_test": (504, ROW3_Y, 364, ROW3_H),
@@ -67,8 +68,18 @@ PAGES = {
 
 
 def slicer_slots(page):
-    weights = [w for _, _, w in PAGES[page]["slicers"]] + [0.62]
-    return distribute(weights)
+    """x/width of each slicer, then of the "More filters" button. Date and the button get fixed widths."""
+    items = PAGES[page]["slicers"]
+    gap = 10
+    free = X1 - X0 - gap * len(items) - DATE_W - MORE_W
+    flex = sum(w for name, _, w in items if name != "Date")
+    out, x = [], X0
+    for name, _, w in items:
+        width = DATE_W if name == "Date" else round(free * w / flex, 1)
+        out.append((round(x, 1), width))
+        x += width + gap
+    out.append((round(x, 1), MORE_W))
+    return out
 
 
 # --------------------------------------------------------------------------- artwork
@@ -154,7 +165,7 @@ def page_html(page):
             radial-gradient(460px 220px at 18% 140%, rgba(47,110,186,.30), transparent 72%),
             linear-gradient(115deg, #0A2756 0%, #0E336D 48%, #1A4C92 100%); }}
   .band::after {{ content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: rgba(255,255,255,.07); }}
-  .motif {{ position: absolute; left: {600 - RAIL_W}px; top: 4px; }}
+  .motif {{ position: absolute; left: {552 - RAIL_W}px; top: 4px; }}
   .tl {{ font: 600 7.5px Inter, sans-serif; letter-spacing: .14em; fill: rgba(255,255,255,.42); }}
   .rail {{ position: absolute; left: 0; top: 0; width: {RAIL_W}px; height: {H}px;
           background: radial-gradient(160px 220px at 50% -40px, rgba(110,170,235,.32), transparent 75%),
