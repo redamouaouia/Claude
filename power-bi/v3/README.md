@@ -14,6 +14,35 @@ Même rapport que la V2 : même table Databricks, mêmes mesures, mêmes filtres
 | **Characteristics** | Cartes KPI avec une mini-courbe de tendance par jour. Courbe Pass / Fail avec un 2ᵉ axe pour les Fail, enfin lisibles. Barres affinées. |
 | **More filters** | Voile plus sombre, panneau avec ombre, boutons en pilules. |
 
+## Page 3 « Reaction limits »
+
+`add_reaction_limits.py` ajoute la page 3 au `.pbix` V3 enregistré par Power BI Desktop. Comme le modèle change, il
+produit un modèle de rapport (`out/Quality_Dashboard_V3_RL.pbit`) : à l'ouverture, Power BI recharge les données.
+
+Une violation est une valeur mesurée conforme (Pass), mais en dehors des limites de réaction
+(`characteristic_result` = « control limit violated »). La page suit la maquette de la spécification :
+
+| Élément | Contenu |
+|---|---|
+| Filtres visibles | Plant, Part, Test, Characteristic et Date, synchronisés avec les pages 1 et 2 |
+| More filters | Inspection reason, KPC |
+| Violations per day | Courbe bleu foncé (couleur des limites de réaction). Le sous-titre donne le total et le taux sur les valeurs évaluées. |
+| Top 15 characteristics | Barres, avec un filtre Top 15 |
+| Violations by part | Treemap : sélectionner une pièce, puis cliquer sur **Details ›** |
+| Violations by test | Nombre de violations et part dans le total |
+| Page de détail (masquée) | Ouverte par **Details ›** : date et heure, pièce, test, caractéristique, valeur, limites de réaction, LSL / USL |
+
+Le modèle gagne 6 colonnes « RL … » dans le dossier *Reaction limit details*. Elles ne sont remplies que pour les
+violations (environ 1 % des lignes), donc elles pèsent très peu. Il gagne aussi 5 mesures dans le dossier
+*Reaction limits* : `RL Violations`, `RL Share`, `RL Violation %`, `RL Summary` et `RL Details Title`.
+
+Avant d'écrire le fichier, le script vérifie :
+- les propriétés de mise en forme, avec le catalogue des visuels ;
+- les champs utilisés, par rapport au modèle ;
+- les signets ;
+- la liaison de la page de détail ;
+- les règles de filtres du validateur PBIR de Microsoft.
+
 ## Régénérer
 
 1. Rendre les fonds de page (Chromium via Playwright) :
@@ -21,11 +50,15 @@ Même rapport que la V2 : même table Databricks, mêmes mesures, mêmes filtres
    python -c "import design; [open(f'out/bg_{p}.html','w').write(design.page_html(p)) for p in design.PAGES]"
    ```
    ```bash
-   node tools/render_backgrounds.js out/bg_overview.html out/bg_overview.png out/bg_chars.html out/bg_chars.png
+   node tools/render_backgrounds.js out/bg_overview.html out/bg_overview.png out/bg_chars.html out/bg_chars.png out/bg_rl.html out/bg_rl.png out/bg_rl_details.html out/bg_rl_details.png
    ```
 2. Appliquer le design au `.pbix` V2 enregistré par Power BI Desktop (format PBIR) :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python restyle.py <V2.pbix>
+   ```
+3. Ajouter la page 3 au `.pbix` V3 enregistré par Power BI Desktop :
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_reaction_limits.py <V3.pbix> --range 2025-01-01 2030-01-01
    ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
@@ -40,9 +73,9 @@ Databricks, et chaque règle de la version SQL devient une étape Power Query.
 
 | Étapes | Rôle |
 |---|---|
-| `Keep 15 columns`, `Filter period`, `Sort rows` | Power Query les traduit lui-même en requête Databricks (*query folding*). Sans cela, chaque actualisation téléchargerait toute la table. |
+| `Keep 20 columns`, `Filter period`, `Sort rows` | Power Query les traduit lui-même en requête Databricks (*query folding*). Sans cela, chaque actualisation téléchargerait toute la table. |
 | `Stop folding` | Tout ce qui suit est calculé par Power BI, et non par Databricks. |
-| `Add Month` … `Add RL Violation` | Les mêmes règles que la requête SQL, une étape par règle. |
+| `Add Month` … `Add RL USL` | Les mêmes règles que la requête SQL, une étape par règle. |
 
 Seule différence de modèle : `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que
 la version SQL le réduit à un entier avec `xxhash64`. Les noms de colonnes ne changent pas : le rapport n'est pas modifié.

@@ -18,8 +18,10 @@ import sys
 import zipfile
 
 HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "v2"))
 import build_template as bt  # noqa: E402  (V2 model: measures, columns, TMDL writer, TOM validation)
+import pbit_package as pkg  # noqa: E402
 
 # Same rules as the SQL of the V2 / V3 model (build_template.SQL_LINES), written as Power Query steps.
 # Power Query sends the first steps (columns, period, sort) to Databricks itself (query folding): without that,
@@ -30,15 +32,16 @@ PQ_M = """let
     Catalog = Source{[Name = "domain_qual_prd"]}[Data],
     Schema = Catalog{[Name = "gold"]}[Data],
     Tracker = Schema{[Name = "dp_cpower_qda_quality_tracker"]}[Data],
-    #"Keep 15 columns" = Table.SelectColumns(Tracker, {
+    #"Keep 20 columns" = Table.SelectColumns(Tracker, {
         "plant", "posting_date", "key_inspection_plan_plant", "process", "characteristic",
         "characteristic_status", "process_status", "key_order_inspection_plan_index_plant", "process_id",
-        "date_time", "reason_for_inspection", "bmm_machine", "kpc", "key_kpc", "characteristic_result"
+        "date_time", "reason_for_inspection", "bmm_machine", "kpc", "key_kpc", "characteristic_result",
+        "characteristic_value_num", "limit_min_alert", "limit_max_alert", "lsl_inspection_plan", "usl_inspection_plan"
     }),
     // Power BI Desktop loads RangeStart..RangeEnd only; the service loads 12 months (incremental refresh).
     StartDate = Date.From(RangeStart),
     EndDate = Date.From(RangeEnd),
-    #"Filter period" = Table.SelectRows(#"Keep 15 columns", each [posting_date] >= StartDate and [posting_date] < EndDate),
+    #"Filter period" = Table.SelectRows(#"Keep 20 columns", each [posting_date] >= StartDate and [posting_date] < EndDate),
     // Rows of one inspection side by side: better compression, as with the ORDER BY of the SQL version.
     #"Sort rows" = Table.Sort(#"Filter period", {
         {"plant", Order.Ascending}, {"posting_date", Order.Ascending},
@@ -84,13 +87,28 @@ PQ_M = """let
     // Reaction limit flag (for the Reaction limits page)
     #"Add RL Violation" = Table.AddColumn(#"Add Press", "RL Violation", each
         if [characteristic_result] = "control limit violated" then 1 else 0, Int64.Type),
-    #"Rename columns" = Table.RenameColumns(#"Add RL Violation", {
+    // Detail of a violation, for the details page: empty on the other rows
+    #"Add RL Time" = Table.AddColumn(#"Add RL Violation", "RL Time", each
+        if [RL Violation] = 1 then (if [date_time] is datetimezone then DateTimeZone.RemoveZone([date_time]) else [date_time])
+        else null, type datetime),
+    #"Add RL Value" = Table.AddColumn(#"Add RL Time", "RL Value", each
+        if [RL Violation] = 1 then [characteristic_value_num] else null, type number),
+    #"Add RL Low Limit" = Table.AddColumn(#"Add RL Value", "RL Low Limit", each
+        if [RL Violation] = 1 then [limit_min_alert] else null, type number),
+    #"Add RL High Limit" = Table.AddColumn(#"Add RL Low Limit", "RL High Limit", each
+        if [RL Violation] = 1 then [limit_max_alert] else null, type number),
+    #"Add RL LSL" = Table.AddColumn(#"Add RL High Limit", "RL LSL", each
+        if [RL Violation] = 1 then [lsl_inspection_plan] else null, type number),
+    #"Add RL USL" = Table.AddColumn(#"Add RL LSL", "RL USL", each
+        if [RL Violation] = 1 then [usl_inspection_plan] else null, type number),
+    #"Rename columns" = Table.RenameColumns(#"Add RL USL", {
         {"plant", "Plant"}, {"posting_date", "Date"}, {"process", "Test"}, {"characteristic", "Characteristic"},
         {"kpc", "KPC"}, {"key_kpc", "Key KPC Code"}
     }),
     #"Keep model columns" = Table.SelectColumns(#"Rename columns", {
         "Plant", "Date", "Month", "Part", "Test", "Characteristic", "Characteristic Result", "Inspection Result",
-        "Inspection ID", "Inspection Reason", "Press", "KPC", "Key KPC Code", "RL Violation"
+        "Inspection ID", "Inspection Reason", "Press", "KPC", "Key KPC Code", "RL Violation",
+        "RL Time", "RL Value", "RL Low Limit", "RL High Limit", "RL LSL", "RL USL"
     }),
     Typed = Table.TransformColumnTypes(#"Keep model columns", {
         {"Plant", type text}, {"Date", type date}, {"Test", type text}, {"Characteristic", type text},
@@ -102,54 +120,9 @@ in
 # Inspection ID is a text key here (the SQL version hashes it to an integer with Databricks' xxhash64).
 COLUMNS = [("Inspection ID", "string", "type text", True, None) if c[0] == "Inspection ID" else c
            for c in bt.COLUMNS]
-
-# Parts of the .pbix that a template does not have (data, credentials) or that are rebuilt for the new model.
-REPLACED = {"Version", "[Content_Types].xml", "DataModel", "SecurityBindings", "DiagramLayout"}
-
-
-def content_types(raw):
-    ct = raw.decode("utf-8-sig")
-    ct = ct.replace('<Override PartName="/SecurityBindings" ContentType="" />', "")
-    ct = ct.replace('<Override PartName="/DataModel" ContentType="" />',
-                    '<Override PartName="/DataModelSchema" ContentType="" />')
-    if "/DataModelSchema" not in ct or "SecurityBindings" in ct or '"/DataModel"' in ct:
-        sys.exit("unexpected [Content_Types].xml:\n" + ct)
-    return ct.encode("utf-8-sig")
-
-
-def _walk(obj):
-    if isinstance(obj, dict):
-        yield obj
-        for v in obj.values():
-            yield from _walk(v)
-    elif isinstance(obj, list):
-        for v in obj:
-            yield from _walk(v)
-
-
-def check_fields(zin, model_json):
-    """Every column or measure the report uses must exist in the new model."""
-    fields = {t["name"]: {c["name"] for c in t.get("columns", [])} | {m["name"] for m in t.get("measures", [])}
-              for t in model_json["model"]["tables"]}
-    used, missing = set(), set()
-    for name in zin.namelist():
-        if not (name.startswith("Report/definition/") and name.endswith(".json")):
-            continue
-        doc = json.loads(zin.read(name).decode("utf-8-sig"))
-        aliases = {f["Name"]: f["Entity"] for o in _walk(doc) for f in o.get("From", [])
-                   if isinstance(f, dict) and "Name" in f and "Entity" in f}
-        for o in _walk(doc):
-            src = o.get("Expression", {}).get("SourceRef") if isinstance(o.get("Expression"), dict) else None
-            if "Property" in o and isinstance(src, dict):
-                entity = src.get("Entity") or aliases.get(src.get("Source"))
-                if entity:
-                    used.add((entity, o["Property"]))
-                    if o["Property"] not in fields.get(entity, ()):
-                        missing.add((entity, o["Property"], name))
-    if missing:
-        sys.exit("fields used by the report but missing from the model:\n" +
-                 "\n".join(f"  {e}[{p}] in {n}" for e, p, n in sorted(missing)))
-    print(f"report fields: OK ({len(used)} distinct columns and measures found in the model)")
+# The step "Keep model columns" must list exactly the model columns, in the same order.
+_kept = PQ_M.split('#"Keep model columns"')[1].split("{", 1)[1].split("}", 1)[0]
+assert [x.strip().strip('"') for x in _kept.split(",")] == [c[0] for c in COLUMNS], "PQ_M and COLUMNS differ"
 
 
 def main():
@@ -170,14 +143,14 @@ def main():
     model_json = bt.model_schema(model_dir, schema)
 
     zin = zipfile.ZipFile(args.pbix)
-    check_fields(zin, model_json)
+    pkg.check_fields(pkg.definitions(zin), model_json)
     dst = HERE / "out" / "Quality_Dashboard_V3_PQ.pbit"
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("Version", zin.read("Version"))
-        z.writestr("[Content_Types].xml", content_types(zin.read("[Content_Types].xml")))
+        z.writestr("[Content_Types].xml", pkg.content_types(zin.read("[Content_Types].xml")))
         z.writestr("DataModelSchema", schema.read_bytes())
         z.writestr("DiagramLayout", json.dumps(bt.diagram_layout(model_json)).encode("utf-16-le"))
-        copied = [n for n in zin.namelist() if n not in REPLACED]
+        copied = [n for n in zin.namelist() if n not in pkg.REPLACED]
         for name in copied:
             z.writestr(name, zin.read(name))
     print(f"written {dst} ({dst.stat().st_size:,} bytes): model rebuilt, {len(copied)} report parts copied, "

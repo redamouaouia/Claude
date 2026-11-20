@@ -16,7 +16,7 @@ ROW2_Y, ROW2_H = 156, 254
 ROW3_Y, ROW3_H = 424, 280
 GAP = 16
 
-NAV = [("Overview", "overview"), ("Characteristics", "chars")]
+NAV = [("Overview", "overview"), ("Characteristics", "chars"), ("Reaction limits", "rl")]
 NAV_TILES = {k: (10, 96 + i * 74, 76, 64) for i, (_, k) in enumerate(NAV)}
 CLEAR_TILE = (10, 636, 76, 64)
 REFRESH_PILL = (966, 22, 290, 26)
@@ -64,12 +64,42 @@ PAGES = {
             "table": (884, ROW3_Y, 372, ROW3_H),
         },
     },
+    # Page 3, laid out as the mockup of the specification: violations per day, top 15 characteristics on the
+    # right, violations by part (with the Details button) and by test.
+    "rl": {
+        "title": "Reaction limits",
+        "question": "Where are measurements getting close to the limit?",
+        "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
+                    ("Characteristic", "Characteristic", 1.25), ("Date", "Date", 1.45)],
+        "more_count": 2,
+        "cards": {
+            "line": (X0, ROW2_Y, 756, ROW2_H),
+            "top15": (896, ROW2_Y, 360, ROW2_H + ROW3_H + (ROW3_Y - ROW2_Y - ROW2_H)),
+            "treemap": (X0, ROW3_Y, 370, ROW3_H),
+            "table": (510, ROW3_Y, 370, ROW3_H),
+        },
+    },
+    # Drill-through page opened by "Details" on "Violations by part": the list of violations of that part.
+    "rl_details": {
+        "title": "Reaction limit details",
+        "question": "Which measured values are outside the reaction limits?",
+        "nav": "rl",
+        "slicers": [],
+        "context": "Selection",
+        "cards": {
+            "table": (X0, ROW2_Y, X1 - X0, ROW2_H + ROW3_H + (ROW3_Y - ROW2_Y - ROW2_H)),
+        },
+    },
 }
+CONTEXT = (X0, SLICER_Y, 820, SLICER_H)          # details page: the part chosen with "Details"
+BACK = (X1 - MORE_W, SLICER_Y, MORE_W, SLICER_H)  # details page: back to Reaction limits
 
 
 def slicer_slots(page):
     """x/width of each slicer, then of the "More filters" button. Date and the button get fixed widths."""
     items = PAGES[page]["slicers"]
+    if not items:
+        return [(X1 - MORE_W, MORE_W)]
     gap = 10
     free = X1 - X0 - gap * len(items) - DATE_W - MORE_W
     flex = sum(w for name, _, w in items if name != "Date")
@@ -87,6 +117,7 @@ ICONS = {
     "overview": '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/>'
                 '<rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
     "chars": '<rect x="2.5" y="7.5" width="19" height="9" rx="2"/><path d="M6.5 7.5v3.2M10 7.5v2M13.5 7.5v3.2M17 7.5v2"/>',
+    "rl": '<path d="M2.5 8.5h19" stroke-dasharray="2.2 2.2"/><path d="M6 20.5v-6M10 20.5v-8.5M14 20.5v-16M18 20.5v-6.5"/>',
     "clear": '<path d="M4 5h15l-5.8 6.6V17l-3.4 1.8v-7.2z"/><path d="M16.6 14.6l4 4M20.6 14.6l-4 4"/>',
     "glyph": '<path d="M3 6.5h18M3 17.5h18" stroke-dasharray="2.2 2.2"/>'
              '<path d="M3 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0 2.4 2.6 3.6 1.4"/>',
@@ -134,12 +165,15 @@ def page_html(page):
     labels = "".join(
         f'<div class="flabel" style="left:{x + 2}px;top:{LABEL_Y}px;width:{w}px">{html.escape(lbl)}</div>'
         for (x, w), (_, lbl, _) in zip(slots, spec["slicers"]))
+    if spec.get("context"):
+        labels += (f'<div class="flabel" style="left:{CONTEXT[0] + 2}px;top:{LABEL_Y}px;width:{CONTEXT[2]}px">'
+                   f'{html.escape(spec["context"])}</div>')
     plates = "".join(f'<div class="plate" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px"></div>'
                      for x, y, w, h in spec["cards"].values())
     tiles = ""
     for label, key in NAV:
         x, y, w, h = NAV_TILES[key]
-        active = " active" if key == page else ""
+        active = " active" if key == spec.get("nav", page) else ""
         tiles += (f'<div class="tile{active}" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
                   f'{icon(key, 22, "#FFFFFF" if active else "rgba(255,255,255,.70)")}'
                   f'<span>{label}</span></div>')
@@ -178,6 +212,7 @@ def page_html(page):
   .tile {{ position: absolute; border-radius: 14px; display: flex; flex-direction: column; align-items: center;
           justify-content: center; gap: 7px; color: rgba(255,255,255,.66); font-size: 9.5px; font-weight: 500;
           letter-spacing: .01em; }}
+  .tile span {{ text-align: center; line-height: 1.15; padding: 0 3px; }}
   .tile.active {{ background: rgba(255,255,255,.13); box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); color: #fff; }}
   .tile.active::before {{ content: ""; position: absolute; left: -10px; top: 18px; bottom: 18px; width: 3px;
                          border-radius: 0 3px 3px 0; background: #6FA8E8; }}

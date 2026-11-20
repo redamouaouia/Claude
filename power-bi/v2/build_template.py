@@ -49,7 +49,14 @@ SQL_LINES = [
     "  NULLIF(trim(bmm_machine), '') AS `Press`,",
     "  kpc AS `KPC`,",
     "  key_kpc AS `Key KPC Code`,",
-    "  CASE WHEN characteristic_result = 'control limit violated' THEN 1 ELSE 0 END AS `RL Violation`",
+    "  CASE WHEN characteristic_result = 'control limit violated' THEN 1 ELSE 0 END AS `RL Violation`,",
+    # Detail of a reaction-limit violation, for the details page. Empty on the other ~99 % of the rows,
+    # so these columns cost almost nothing in the model.
+    *[f"  CASE WHEN characteristic_result = 'control limit violated' THEN {src} END AS `{name}`{sep}"
+      for (src, name), sep in zip([("date_time", "RL Time"), ("characteristic_value_num", "RL Value"),
+                                   ("limit_min_alert", "RL Low Limit"), ("limit_max_alert", "RL High Limit"),
+                                   ("lsl_inspection_plan", "RL LSL"), ("usl_inspection_plan", "RL USL")],
+                                  [","] * 5 + [""])],
     f"FROM {SOURCE_TABLE}",
 ]
 SQL_WHERE = "WHERE posting_date >= DATE'{start}' AND posting_date < DATE'{end}'"
@@ -70,7 +77,22 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("KPC", "string", "type text", False, None),
     ("Key KPC Code", "int64", "Int64.Type", True, "0"),
     ("RL Violation", "int64", "Int64.Type", True, "0"),
+    ("RL Time", "dateTime", "type datetime", False, "dd/MM/yyyy HH:mm"),
+    ("RL Value", "double", "type number", False, "0.####"),
+    ("RL Low Limit", "double", "type number", False, "0.####"),
+    ("RL High Limit", "double", "type number", False, "0.####"),
+    ("RL LSL", "double", "type number", False, "0.####"),
+    ("RL USL", "double", "type number", False, "0.####"),
 ]
+RL_DETAIL = "Only filled for values outside the reaction limits (RL Violation = 1)."
+COLUMN_INFO = {  # name: (display folder, description)
+    "RL Time": ("Reaction limit details", "Date and time of the measurement. " + RL_DETAIL),
+    "RL Value": ("Reaction limit details", "Measured value. " + RL_DETAIL),
+    "RL Low Limit": ("Reaction limit details", "Lower reaction (alert) limit. " + RL_DETAIL),
+    "RL High Limit": ("Reaction limit details", "Upper reaction (alert) limit. " + RL_DETAIL),
+    "RL LSL": ("Reaction limit details", "Lower specification limit of the inspection plan. " + RL_DETAIL),
+    "RL USL": ("Reaction limit details", "Upper specification limit of the inspection plan. " + RL_DETAIL),
+}
 
 
 def m_text(t):
@@ -138,6 +160,20 @@ MEASURES = [  # (name, expression, format, folder, description, dynamic format)
     ("Char Fail Bar", "[Char Fail]", None, "Bars", None, '"""" & FORMAT([Char Fail %], "0.0%") & """"'),
     ("Last Refresh", "\"Last refresh · \" & FORMAT(MAX('Refresh Info'[Refreshed At]), \"dd/mm/yyyy hh:nn\") & \" UTC\"",
      None, "Report", None, None),
+    # Reaction limits (page 3): a violation is a measured value that passes but is outside the reaction limits.
+    ("RL Violations", "SUM('Quality Tracker'[RL Violation])", "#,0", "Reaction limits",
+     "Measured values that pass but are outside the reaction (alert) limits.", None),
+    ("RL Share", "DIVIDE([RL Violations], CALCULATE([RL Violations], ALLSELECTED()))", "0.0%", "Reaction limits",
+     "Share of all the violations in the current selection.", None),
+    ("RL Violation %", "DIVIDE([RL Violations], [Char Evaluated])", "0.00%", "Reaction limits",
+     "Violations out of the evaluated values (Pass + Fail).", None),
+    ("RL Summary", "IF(\n\tISBLANK([Measured Values]),\n\t\"No measured values in this selection\",\n\t"
+     "FORMAT([RL Violations], \"#,0\") & \" values outside the reaction limits · \" & FORMAT([RL Violation %], "
+     "\"0.00%\") & \" of evaluated values\"\n)", None, "Reaction limits",
+     "Subtitle of the violations-per-day chart.", None),
+    ("RL Details Title", "VAR part = SELECTEDVALUE('Quality Tracker'[Part])\nRETURN\n\tIF(ISBLANK(part), \"All parts\", "
+     "\"Part \" & part) & \" · \" & FORMAT([RL Violations] + 0, \"#,0\") & \" values outside the reaction limits\"",
+     None, "Reaction limits", "Context line of the details page (the part chosen with the Details button).", None),
 ]
 
 
@@ -197,16 +233,21 @@ def write_model(out, settings, source_m=None, columns=None):
         if dyn:
             lines += ["", f"\t\tformatStringDefinition = {dyn}"]
         lines.append("")
-    for name, dtype, _, hidden, fmt in columns:
+    for name, dtype, m_type, hidden, fmt in columns:
+        folder, desc = COLUMN_INFO.get(name, (None, None))
+        if desc:
+            lines.append(f"\t/// {desc}")
         lines.append(f"\tcolumn {tmdl_name(name)}")
         lines.append(f"\t\tdataType: {dtype}")
         if fmt:
             lines.append(f"\t\tformatString: {fmt}")
         if hidden:
             lines.append("\t\tisHidden")
+        if folder:
+            lines.append(f"\t\tdisplayFolder: {folder}")
         lines += [f"\t\tlineageTag: {uuid.uuid4()}", "\t\tsummarizeBy: none", f"\t\tsourceColumn: {name}", "",
                   "\t\tannotation SummarizationSetBy = Automatic", ""]
-        if dtype == "dateTime" and fmt and "y" in fmt:
+        if m_type == "type date":
             lines[-1:-1] = ["\t\tannotation UnderlyingDateTimeDataType = Date", ""]
     lines += [f"\tpartition {tmdl_name(T)} = m", "\t\tmode: import", "\t\tsource ="]
     lines += ["\t\t\t\t" + x for x in source_m.split("\n")]

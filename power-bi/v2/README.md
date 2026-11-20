@@ -34,13 +34,15 @@ La jauge « 12 derniers mois » ne montre donc que cette période tant que le ra
 
 ## Contenu du modèle
 
-- **Quality Tracker** : une ligne par valeur mesurée. La requête SQL ne lit que 15 des 65 colonnes de la table.
+- **Quality Tracker** : une ligne par valeur mesurée. La requête SQL ne lit que 20 des 65 colonnes de la table.
   Elle calcule dans Databricks :
   - `Inspection Result`, à partir de `process_status` : OK → Pass, KO → Fail, NA → Not assessed ;
   - `Characteristic Result`, à partir de `characteristic_status` : OK → Pass, KO → Fail, NA → Not evaluated ;
   - `Inspection ID`, une empreinte de *ordre + plan + indice + test + date/heure* (749 535 inspections sur 12 mois) ;
   - `Part`, le plan d'inspection sans le suffixe `_PLANT` ;
-  - `RL Violation`, qui vaut 1 si `characteristic_result` = « control limit violated » (pour la page Reaction limits).
+  - `RL Violation`, qui vaut 1 si `characteristic_result` = « control limit violated » (pour la page Reaction limits) ;
+  - `RL Time`, `RL Value`, `RL Low Limit`, `RL High Limit`, `RL LSL` et `RL USL` : la date et l'heure, la valeur,
+    les limites de réaction et la tolérance, remplies seulement pour ces violations (page de détail).
 - **Refresh Info** : l'heure de la dernière actualisation, en UTC.
 - Les pourcentages Pass / Fail ne comptent que les résultats **Pass** et **Fail** : les inspections
   *Not assessed* et les valeurs *Not evaluated* sont exclues.
