@@ -11,8 +11,12 @@ Page 3 follows the mockup of the specification: violations per day, top 15 chara
 (with a "Details" button) and by test. "Details" opens a hidden drill-through page that lists the violations of the
 selected part: date and time, part, test, characteristic, value, reaction limits and tolerance. Header filters,
 navigation and the "More filters" panel are copies of those of page 2, so they stay synced with the other pages.
-The model, with the new reaction-limit columns and measures, comes from ../v2/build_template.py.
-Output: out/Quality_Dashboard_V3_RL.pbit (git-ignored).
+Two cases:
+- the report has no page 3 yet: the model, with the new reaction-limit columns and measures, comes from
+  ../v2/build_template.py, and the output is a template, out/Quality_Dashboard_V3_RL.pbit (data reloaded on opening);
+- the report already has page 3 (saved after loading that template): pages 3 and its details page are rebuilt, the
+  model and its data are kept, and the output is out/Quality_Dashboard_V3_RL.pbix.
+Outputs are git-ignored.
 """
 import argparse
 import copy
@@ -37,6 +41,8 @@ RL_BLUE = "#1F4E79"    # colour of the reaction limits in the specification
 RL_LIGHT = "#BDD7EE"   # its light shade, for data bars
 RL_MID = "#7C9CC6"     # lowest value of the treemap gradient
 PAGE_TITLES = {"Overview": "overview", "Characteristics": "chars"}
+RL_TITLES = {D.PAGES["rl"]["title"], D.PAGES["rl_details"]["title"]}
+ALL_POINTS = {"data": [{"dataViewWildcard": {"matchingOption": 1}}]}
 BG_NAMES = {"overview": "Overview", "chars": "Characteristics", "rl": "ReactionLimits", "rl_details": "ReactionLimitDetails"}
 
 
@@ -249,11 +255,14 @@ def build_rl_page(src, idx, page_ids):
         "Y": [R.projection("Measure", "RL Violations", "Violations")]},
         sort=("Measure", "RL Violations", "Descending")))
     top["visual"]["objects"] = {
-        "dataPoint": [SEL({"fill": C(RL_BLUE)}, {"metadata": ref("RL Violations")})],
+        # Seen in Desktop: the series colour alone (metadata selector) left this chart in the theme's blue, while
+        # the "all data points" selector coloured the treemap. Both are set, with the same colour.
+        "dataPoint": [SEL({"fill": C(RL_BLUE)}, {"metadata": ref("RL Violations")}),
+                      SEL({"fill": C(RL_BLUE)}, ALL_POINTS)],
         "labels": [P(show=B(True), color=C(R.TEXT), fontSize=N(9), labelPosition=S("OutsideEnd"))],
         "categoryAxis": [P(show=B(True), showAxisTitle=B(False), fontSize=N(9), labelColor=C(R.TEXT),
-                           maxMarginFactor=R.I(46), innerPadding=R.I(28))],
-        "valueAxis": [P(show=B(False), gridlineShow=B(False))],
+                           maxMarginFactor=R.I(58), innerPadding=R.I(28))],
+        "valueAxis": [P(show=B(False), showAxisTitle=B(False), gridlineShow=B(False))],
         "legend": [P(show=B(False))],
     }
     top["visual"]["visualContainerObjects"] = R.vco_card("Top 15 characteristics",
@@ -267,9 +276,8 @@ def build_rl_page(src, idx, page_ids):
         "Tooltips": [R.projection("Measure", "RL Violation %", "Violation rate")]},
         sort=("Measure", "RL Violations", "Descending")))
     tree["visual"]["objects"] = {
-        "dataPoint": [SEL({"fill": gradient("RL Violations", RL_MID, RL_BLUE)},
-                          {"data": [{"dataViewWildcard": {"matchingOption": 1}}]})],
-        "labels": [P(show=B(True), color=C(R.WHITE), fontSize=N(9))],
+        "dataPoint": [SEL({"fill": gradient("RL Violations", RL_MID, RL_BLUE)}, ALL_POINTS)],
+        "labels": [P(show=B(True), color=C(R.WHITE), fontSize=N(9), labelDisplayUnits=N(1), labelPrecision=R.I(0))],
         "categoryLabels": [P(show=B(True), color=C(R.WHITE), fontSize=N(9))],
         "legend": [P(show=B(False))],
     }
@@ -282,6 +290,14 @@ def build_rl_page(src, idx, page_ids):
     set_link(details, type="Drillthrough", drillthroughSection=page_ids["rl_details"],
              enabledTooltip="List of the violations of the selected part",
              disabledTooltip="Select a part in the chart first")
+    # Until a part is selected the button is disabled, and Power BI then paints its own grey "disabled" fill over
+    # the label underneath (seen on screen). The disabled state is made a light white veil instead: the label
+    # shows, greyed out, and becomes sharp once a part is selected.
+    o = details["visual"]["objects"]
+    o["fill"].append(SEL({"show": B(True), "fillColor": C(R.WHITE), "transparency": N(45)}, {"id": "disabled"}))
+    o["text"].append(SEL({"show": B(False)}, {"id": "disabled"}))
+    o["outline"].append(SEL({"show": B(False)}, {"id": "disabled"}))
+    o["icon"].append(SEL({"shapeType": S("blank")}, {"id": "disabled"}))
     add(R.twin_textbox(details, dict(text="Details  ›", bg="#EEF2F8", fg=R.NAVY, size=9, bold=True, radius=13,
                                      pad_top=4, bg_transp=0, border=True)))
     add(details)
@@ -296,9 +312,10 @@ def build_rl_page(src, idx, page_ids):
     o = table["visual"]["objects"]
     o["columnFormatting"] = [column_format("RL Violations", bars=RL_LIGHT),
                              column_format("RL Share", color=RL_BLUE)]
-    o["columnWidth"] = [SEL({"value": N(166)}, {"metadata": ref("Test")}),
-                        SEL({"value": N(106)}, {"metadata": ref("RL Violations")}),
-                        SEL({"value": N(66)}, {"metadata": ref("RL Share")})]
+    # 310 px of columns in a 338 px wide table: room left for the vertical scroll bar (no horizontal scrolling)
+    o["columnWidth"] = [SEL({"value": N(150)}, {"metadata": ref("Test")}),
+                        SEL({"value": N(98)}, {"metadata": ref("RL Violations")}),
+                        SEL({"value": N(62)}, {"metadata": ref("RL Share")})]
     table["visual"]["visualContainerObjects"] = R.vco_card("Violations by test",
                                                            "Number of violations · share of all the violations")
     table["filterConfig"] = {"filters": [above_zero("RL Violations")]}
@@ -466,6 +483,69 @@ def checks(defs, pages_order):
     return problems
 
 
+# --------------------------------------------------------------------------- report that already has page 3
+def strip_reaction_limits(defs, meta):
+    """Removes page 3, its details page, their bookmarks and the buttons leading to them. True if they existed."""
+    gone = [pid for pid in meta["pageOrder"] if defs[f"pages/{pid}/page.json"]["displayName"] in RL_TITLES]
+    if not gone:
+        return False
+    for k in [k for k in defs if any(k.startswith(f"pages/{pid}/") for pid in gone)]:
+        del defs[k]
+    meta["pageOrder"] = [p for p in meta["pageOrder"] if p not in gone]
+    if meta.get("activePageName") in gone:
+        meta["activePageName"] = meta["pageOrder"][0]
+    dead = set()
+    for k in [k for k in defs if k.startswith("bookmarks/") and k.endswith(".bookmark.json")]:
+        if defs[k]["explorationState"].get("activeSection") in gone:
+            dead.add(defs[k]["name"])
+            del defs[k]
+    index = defs["bookmarks/bookmarks.json"]
+    index["items"] = [i for i in index["items"] if i["name"] not in dead]
+    for k in [k for k in defs if "/visuals/" in k]:
+        link = R.link_of(defs[k])
+        if link.get("navigationSection") in gone or link.get("drillthroughSection") in gone:
+            del defs[k]
+    return True
+
+
+def model_fields(pbix):
+    """Columns and measures of the model inside a .pbix, in the shape check_fields expects."""
+    try:
+        from pbixray import PBIXRay
+    except ImportError:
+        print("pbixray is not installed: fields are checked against the expected V3 model instead")
+        tables = {T: [c[0] for c in bt.COLUMNS] + [m[0] for m in bt.MEASURES], "Refresh Info": ["Refreshed At"]}
+    else:
+        m = PBIXRay(pbix)
+        tables = {}
+        for _, r in m.schema.iterrows():
+            tables.setdefault(r["TableName"], []).append(r["ColumnName"])
+        for _, r in m.dax_measures.iterrows():
+            tables.setdefault(r["TableName"], []).append(r["Name"])
+    return {"model": {"tables": [{"name": t, "columns": [{"name": n} for n in names]} for t, names in tables.items()]}}
+
+
+def write_pbix(zin, defs, images, old, dst):
+    """Same .pbix with the new report: data model kept, credentials part dropped (Desktop rewrites it)."""
+    skip = {"SecurityBindings"} | {f"Report/StaticResources/RegisteredResources/{n}" for n in old}
+    ct = zin.read("[Content_Types].xml").decode("utf-8-sig").replace(
+        '<Override PartName="/SecurityBindings" ContentType="" />', "")
+    with zipfile.ZipFile(dst, "w") as z:
+        for info in zin.infolist():
+            n = info.filename
+            if n in skip or n.startswith(pkg.PREFIX):
+                continue
+            zi = zipfile.ZipInfo(n, date_time=info.date_time)
+            zi.compress_type = info.compress_type
+            z.writestr(zi, ct.encode("utf-8-sig") if n == "[Content_Types].xml" else zin.read(n))
+        for k, v in sorted(defs.items()):
+            z.writestr(zipfile.ZipInfo(pkg.PREFIX + k), json.dumps(v, ensure_ascii=False, separators=(",", ":")),
+                       compress_type=zipfile.ZIP_DEFLATED)
+        for n, data in images.items():
+            z.writestr(zipfile.ZipInfo("Report/StaticResources/RegisteredResources/" + n), data,
+                       compress_type=zipfile.ZIP_DEFLATED)
+
+
 # --------------------------------------------------------------------------- main
 def set_background(page, title, item):
     page["objects"] = page.get("objects", {})
@@ -487,6 +567,9 @@ def main():
     zin = zipfile.ZipFile(args.pbix)
     defs = pkg.definitions(zin)
     meta = defs["pages/pages.json"]
+    # A report that already has page 3 (its model has the reaction-limit columns and measures): pages 3 and its
+    # details page are rebuilt and the model and its data are kept, so the output is a .pbix, not a template.
+    rebuild = strip_reaction_limits(defs, meta)
     page_keys = {}
     for pid in meta["pageOrder"]:
         title = defs[f"pages/{pid}/page.json"]["displayName"]
@@ -587,6 +670,13 @@ def main():
         sys.exit("report check failed")
     print(f"report checks: OK ({len(meta['pageOrder'])} pages, "
           f"{sum(1 for k in defs if '/visuals/' in k)} visuals, {len(defs['bookmarks/bookmarks.json']['items'])} bookmarks)")
+
+    if rebuild:
+        pkg.check_fields(defs, model_fields(args.pbix))
+        dst = HERE / "out" / "Quality_Dashboard_V3_RL.pbix"
+        write_pbix(zin, defs, images, old, dst)
+        print(f"written {dst} ({dst.stat().st_size:,} bytes): page 3 and its details page rebuilt, model and data kept")
+        return
 
     # model: V2 model with the reaction-limit columns and measures
     settings = json.loads(pathlib.Path(args.settings).read_text())

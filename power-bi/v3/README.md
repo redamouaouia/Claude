@@ -18,6 +18,9 @@ Même rapport que la V2 : même table Databricks, mêmes mesures, mêmes filtres
 
 `add_reaction_limits.py` ajoute la page 3 au `.pbix` V3 enregistré par Power BI Desktop. Comme le modèle change, il
 produit un modèle de rapport (`out/Quality_Dashboard_V3_RL.pbit`) : à l'ouverture, Power BI recharge les données.
+Si le `.pbix` fourni contient déjà la page 3, le modèle a déjà les colonnes et mesures nécessaires. Le script
+reconstruit alors la page 3 et sa page de détail en gardant le modèle et ses données, et produit directement
+`out/Quality_Dashboard_V3_RL.pbix`, sans rechargement.
 
 Une violation est une valeur mesurée conforme (Pass), mais en dehors des limites de réaction
 (`characteristic_result` = « control limit violated »). La page suit la maquette de la spécification :
