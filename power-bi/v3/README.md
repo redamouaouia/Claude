@@ -46,8 +46,19 @@ Avant d'écrire le fichier, le script vérifie :
 - la liaison de la page de détail ;
 - les règles de filtres du validateur PBIR de Microsoft.
 
+## Logo
+
+La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
+complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké dans ce dépôt public :
+`make_logo_assets.py <logo.png>` en crée les versions blanches dans `out/brand/` (ignoré par git), en recolorant
+seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent l'icône et le texte d'origine.
+
 ## Régénérer
 
+0. Versions blanches du logo (une fois) :
+   ```bash
+   python make_logo_assets.py <logo.png>
+   ```
 1. Rendre les fonds de page (Chromium via Playwright) :
    ```bash
    python -c "import design; [open(f'out/bg_{p}.html','w').write(design.page_html(p)) for p in design.PAGES]"
@@ -62,6 +73,10 @@ Avant d'écrire le fichier, le script vérifie :
 3. Ajouter la page 3 au `.pbix` V3 enregistré par Power BI Desktop :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_reaction_limits.py <V3.pbix> --range 2025-01-01 2030-01-01
+   ```
+4. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_backgrounds.py <V4.pbix>
    ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI

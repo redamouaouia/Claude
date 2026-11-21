@@ -4,7 +4,12 @@ The backgrounds are drawn in HTML/CSS and rendered at 2x (2560 x 1440) with Chro
 filter label and title in the artwork sits exactly under the native Power BI visual that uses the same
 coordinates below, so the two layers line up.
 """
+import base64
 import html
+import pathlib
+
+HERE = pathlib.Path(__file__).resolve().parent
+BRAND = HERE / "out" / "brand"  # white logo files made by make_logo_assets.py (not stored in the repository)
 
 # --------------------------------------------------------------------------- canvas geometry (Power BI px)
 W, H = 1280, 720
@@ -159,6 +164,28 @@ def tolerance_motif():
     </svg>'''
 
 
+def _data_uri(path):
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode()
+
+
+def badge_html():
+    """Tile at the top of the rail: the company symbol, in white, between two dashed limit lines (USL / LSL),
+    a nod to the tolerance band of the header. Without the logo files, the tolerance glyph."""
+    symbol = BRAND / "symbol_white.png"
+    if not symbol.exists():
+        return f'<div class="glyph">{icon("glyph", 26, "rgba(255,255,255,.92)", 1.5)}</div>'
+    return (f'<div class="badge"><i class="lim top"></i><i class="lim bottom"></i>'
+            f'<img src="{_data_uri(symbol)}" alt=""></div>')
+
+
+def eyebrow_html():
+    rest = "Quality Dashboard &nbsp;·&nbsp; Plant Visual Management"
+    logo = BRAND / "logo_white.png"
+    if not logo.exists():
+        return f'<div class="eyebrow">OPmobility &nbsp;·&nbsp; {rest}</div>'
+    return f'<div class="eyebrow brand"><img src="{_data_uri(logo)}" alt=""><span>{rest}</span></div>'
+
+
 def page_html(page):
     spec = PAGES[page]
     slots = slicer_slots(page)
@@ -209,6 +236,20 @@ def page_html(page):
   .glyph {{ position: absolute; left: 24px; top: 20px; width: 48px; height: 48px; border-radius: 14px;
            border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06);
            display: grid; place-items: center; }}
+  .badge {{ position: absolute; left: 20px; top: 16px; width: 56px; height: 56px; border-radius: 16px; overflow: hidden;
+           border: 1px solid rgba(255,255,255,.26);
+           background: radial-gradient(46px 40px at 50% 46%, rgba(111,168,232,.45), transparent 72%),
+                       linear-gradient(150deg, rgba(255,255,255,.18), rgba(255,255,255,.04));
+           box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 12px 24px -10px rgba(0,0,0,.6);
+           display: grid; place-items: center; }}
+  .badge img {{ width: 38px; position: relative; filter: drop-shadow(0 1px 2px rgba(6,26,60,.45)); }}
+  .badge .lim {{ position: absolute; left: 5px; right: 5px; height: 0; border-top: 1px dashed rgba(255,255,255,.34);
+                -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); }}
+  .badge .lim.top {{ top: 10px; }}
+  .badge .lim.bottom {{ bottom: 10px; }}
+  .eyebrow.brand {{ display: flex; align-items: center; gap: 9px; top: 12px; }}
+  .eyebrow.brand img {{ height: 15px; opacity: .95; }}
+  .eyebrow.brand span::before {{ content: "·"; margin-right: 9px; }}
   .tile {{ position: absolute; border-radius: 14px; display: flex; flex-direction: column; align-items: center;
           justify-content: center; gap: 7px; color: rgba(255,255,255,.66); font-size: 9.5px; font-weight: 500;
           letter-spacing: .01em; }}
@@ -233,9 +274,9 @@ def page_html(page):
   <div class="band">{tolerance_motif()}</div>
   <div class="rail"></div>
   <svg class="ruler" width="8" height="{H}">{ticks}</svg>
-  <div class="glyph">{icon("glyph", 26, "rgba(255,255,255,.92)", 1.5)}</div>
+  {badge_html()}
   {tiles}
-  <div class="eyebrow">OPmobility &nbsp;·&nbsp; Quality Dashboard &nbsp;·&nbsp; Plant Visual Management</div>
+  {eyebrow_html()}
   <h1>{html.escape(spec["title"])}</h1>
   <div class="q">{html.escape(spec["question"])}</div>
   <div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>
