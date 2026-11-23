@@ -34,7 +34,8 @@ La jauge « 12 derniers mois » ne montre donc que cette période tant que le ra
 
 ## Contenu du modèle
 
-- **Quality Tracker** : une ligne par valeur mesurée. La requête SQL ne lit que 20 des 65 colonnes de la table.
+- **Quality Tracker**, la seule table de données : une ligne par valeur mesurée. La requête SQL ne lit que 21 des
+  65 colonnes de la table.
   Elle calcule dans Databricks :
   - `Inspection Result`, à partir de `process_status` : OK → Pass, KO → Fail, NA → Not assessed ;
   - `Characteristic Result`, à partir de `characteristic_status` : OK → Pass, KO → Fail, NA → Not evaluated ;
@@ -42,8 +43,12 @@ La jauge « 12 derniers mois » ne montre donc que cette période tant que le ra
   - `Part`, le plan d'inspection sans le suffixe `_PLANT` ;
   - `RL Violation`, qui vaut 1 si `characteristic_result` = « control limit violated » (pour la page Reaction limits) ;
   - `RL Time`, `RL Value`, `RL Low Limit`, `RL High Limit`, `RL LSL` et `RL USL` : la date et l'heure, la valeur,
-    les limites de réaction et la tolérance, remplies seulement pour ces violations (page de détail).
-- **Refresh Info** : l'heure de la dernière actualisation, en UTC.
+    les limites de réaction et la tolérance, remplies seulement pour ces violations (page de détail) ;
+  - les sommes du Cpk (dossier *Cpk sums*), sur une ligne par caractéristique, motif d'inspection et jour (page Cpk
+    de la V3).
+
+  Power Query ajoute `Refreshed At`, l'heure de l'actualisation en UTC. La mesure `Last Refresh` en affiche la plus
+  récente.
 - Les pourcentages Pass / Fail ne comptent que les résultats **Pass** et **Fail** : les inspections
   *Not assessed* et les valeurs *Not evaluated* sont exclues.
 

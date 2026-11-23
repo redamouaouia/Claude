@@ -103,7 +103,7 @@ PAGES["cpk"] = {
     "status": "To be validated",
     "question": "Which parts, tests and characteristics are capable?",
     "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
-                ("Characteristic", "Characteristic", 1.25), ("Month", "Month", 1.45)],
+                ("Characteristic", "Characteristic", 1.25), ("Date", "Date", 1.45)],
     "more_count": 3,
     # The detail table gets the most room; Cpk pass % and the donut share one card (as the hero and the gauge of
     # page 1), the figure on top.

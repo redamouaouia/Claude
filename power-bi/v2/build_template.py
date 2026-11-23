@@ -31,36 +31,86 @@ SOURCE_TABLE = "domain_qual_prd.gold.dp_cpower_qda_quality_tracker"
 # --------------------------------------------------------------------------- source query (Databricks SQL)
 # One row per measured value. Pass / Fail labels, the inspection key and the reaction-limit flag are computed
 # in Databricks so that Power BI only stores small, well-compressed columns.
+PART_SQL = ("CASE WHEN endswith(key_inspection_plan_plant, concat('_', plant)) "
+            "THEN left(key_inspection_plan_plant, length(key_inspection_plan_plant) - length(plant) - 1) "
+            "ELSE key_inspection_plan_plant END")
+# Values that enter the Cpk (method of the QDA report): variable characteristics with a Pass or Fail result,
+# a numeric value below 100 000 and at least one specification limit.
+IN_CPK = ("characteristic_type = 'variable' AND characteristic_status IN ('OK', 'KO') "
+          "AND characteristic_value_num IS NOT NULL AND characteristic_value_num < 100000 "
+          "AND (usl_inspection_plan IS NOT NULL OR lsl_inspection_plan IS NOT NULL)")
+CPK_KEY = "plant, part_name, process, characteristic"  # one Cpk per plant, part, test and characteristic
+CPK_ORDER = "date_time, key_order_inspection_plan_index_plant"  # time order of the values (moving ranges)
+WHERE_MARK = "  {where}"
 SQL_LINES = [
+    "WITH src AS (",
+    "  SELECT",  # the 21 columns read from the table (out of 65), and the values derived from them
+    "    plant, posting_date, process, characteristic, characteristic_status, process_status,",
+    "    key_order_inspection_plan_index_plant, process_id, date_time, bmm_machine, kpc, key_kpc,",
+    "    characteristic_result, characteristic_value_num, limit_min_alert, limit_max_alert,",
+    "    lsl_inspection_plan, usl_inspection_plan,",
+    f"    {PART_SQL} AS part_name,",
+    "    NULLIF(trim(reason_for_inspection), '') AS reason,",
+    "    CAST(date_trunc('MONTH', posting_date) AS DATE) AS month_start,",
+    f"    coalesce({IN_CPK}, false) AS in_cpk",
+    f"  FROM {SOURCE_TABLE}",
+    WHERE_MARK,
+    "), ranges AS (",
+    "  SELECT *, CASE WHEN in_cpk THEN abs(characteristic_value_num - lag(characteristic_value_num)",
+    f"    OVER (PARTITION BY {CPK_KEY}, in_cpk ORDER BY {CPK_ORDER})) END AS moving_range",
+    "  FROM src",
+    "), sums AS (",
+    "  SELECT *,",
+    "    count(*) OVER grp AS cpk_count, sum(characteristic_value_num) OVER grp AS cpk_sum,",
+    "    count(moving_range) OVER grp AS cpk_range_count, sum(moving_range) OVER grp AS cpk_range_sum,",
+    "    last_value(usl_inspection_plan) OVER lim AS cpk_usl, last_value(lsl_inspection_plan) OVER lim AS cpk_lsl,",
+    f"    row_number() OVER (PARTITION BY {CPK_KEY}, reason, posting_date, in_cpk",
+    "      ORDER BY date_time DESC, key_order_inspection_plan_index_plant DESC) AS cpk_row",
+    "  FROM ranges",
+    f"  WINDOW grp AS (PARTITION BY {CPK_KEY}, reason, posting_date, in_cpk),",
+    f"    lim AS (PARTITION BY {CPK_KEY}, in_cpk ORDER BY {CPK_ORDER}",
+    "      ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)",
+    ")",
     "SELECT",
     "  plant AS `Plant`,",
     "  posting_date AS `Date`,",
-    "  CAST(date_trunc('MONTH', posting_date) AS DATE) AS `Month`,",
-    "  CASE WHEN endswith(key_inspection_plan_plant, concat('_', plant))",
-    "       THEN left(key_inspection_plan_plant, length(key_inspection_plan_plant) - length(plant) - 1)",
-    "       ELSE key_inspection_plan_plant END AS `Part`,",
+    "  month_start AS `Month`,",
+    "  part_name AS `Part`,",
     "  process AS `Test`,",
     "  characteristic AS `Characteristic`,",
     "  CASE characteristic_status WHEN 'OK' THEN 'Pass' WHEN 'KO' THEN 'Fail' ELSE 'Not evaluated' END"
     " AS `Characteristic Result`,",
     "  CASE process_status WHEN 'OK' THEN 'Pass' WHEN 'KO' THEN 'Fail' ELSE 'Not assessed' END AS `Inspection Result`,",
     "  xxhash64(key_order_inspection_plan_index_plant, process_id, date_time) AS `Inspection ID`,",
-    "  NULLIF(trim(reason_for_inspection), '') AS `Inspection Reason`,",
+    "  reason AS `Inspection Reason`,",
     "  NULLIF(trim(bmm_machine), '') AS `Press`,",
     "  kpc AS `KPC`,",
     "  key_kpc AS `Key KPC Code`,",
     "  CASE WHEN characteristic_result = 'control limit violated' THEN 1 ELSE 0 END AS `RL Violation`,",
     # Detail of a reaction-limit violation, for the details page. Empty on the other ~99 % of the rows,
     # so these columns cost almost nothing in the model.
-    *[f"  CASE WHEN characteristic_result = 'control limit violated' THEN {src} END AS `{name}`{sep}"
-      for (src, name), sep in zip([("date_time", "RL Time"), ("characteristic_value_num", "RL Value"),
-                                   ("limit_min_alert", "RL Low Limit"), ("limit_max_alert", "RL High Limit"),
-                                   ("lsl_inspection_plan", "RL LSL"), ("usl_inspection_plan", "RL USL")],
-                                  [","] * 5 + [""])],
-    f"FROM {SOURCE_TABLE}",
+    *[f"  CASE WHEN characteristic_result = 'control limit violated' THEN {src} END AS `{name}`,"
+      for src, name in [("date_time", "RL Time"), ("characteristic_value_num", "RL Value"),
+                        ("limit_min_alert", "RL Low Limit"), ("limit_max_alert", "RL High Limit"),
+                        ("lsl_inspection_plan", "RL LSL"), ("usl_inspection_plan", "RL USL")]],
+    # Cpk sums: one row per characteristic, inspection reason and day (its last measurement) carries the sums of
+    # that day, the other rows are empty. Power BI adds them up for the days selected and recomputes Cpk.
+    *[f"  CASE WHEN in_cpk AND cpk_row = 1 THEN {src} END AS `{name}`{sep}"
+      for (src, name), sep in zip([("xxhash64(plant, part_name, process, characteristic)", "Cpk Group"),
+                                   ("cpk_count", "Cpk Value Count"), ("cpk_sum", "Cpk Value Sum"),
+                                   ("cpk_range_count", "Cpk Range Count"), ("cpk_range_sum", "Cpk Range Sum"),
+                                   ("cpk_usl", "Cpk USL"), ("cpk_lsl", "Cpk LSL")], [","] * 6 + [""])],
+    "FROM sums",
 ]
 SQL_WHERE = "WHERE posting_date >= DATE'{start}' AND posting_date < DATE'{end}'"
 SQL_ORDER = "ORDER BY `Plant`, `Date`, `Inspection ID`"
+
+
+def sql(start, end):
+    """The query as Databricks runs it for one period (tests and checks)."""
+    where = "  " + SQL_WHERE.format(start=start, end=end)
+    return "\n".join(where if x == WHERE_MARK else x for x in SQL_LINES) + "\n" + SQL_ORDER
+
 
 COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("Plant", "string", "type text", False, None),
@@ -83,7 +133,16 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("RL High Limit", "double", "type number", False, "0.####"),
     ("RL LSL", "double", "type number", False, "0.####"),
     ("RL USL", "double", "type number", False, "0.####"),
+    ("Cpk Group", "int64", "Int64.Type", True, "0"),
+    ("Cpk Value Count", "int64", "Int64.Type", True, "#,0"),
+    ("Cpk Value Sum", "double", "type number", True, None),
+    ("Cpk Range Count", "int64", "Int64.Type", True, "#,0"),
+    ("Cpk Range Sum", "double", "type number", True, None),
+    ("Cpk USL", "double", "type number", True, "0.####"),
+    ("Cpk LSL", "double", "type number", True, "0.####"),
+    ("Refreshed At", "dateTime", "type datetime", True, "General Date"),
 ]
+CPK_SUMS = "Filled on one row per characteristic, inspection reason and day (its last measurement), empty elsewhere."
 RL_DETAIL = "Only filled for values outside the reaction limits (RL Violation = 1)."
 COLUMN_INFO = {  # name: (display folder, description)
     "RL Time": ("Reaction limit details", "Date and time of the measurement. " + RL_DETAIL),
@@ -92,6 +151,15 @@ COLUMN_INFO = {  # name: (display folder, description)
     "RL High Limit": ("Reaction limit details", "Upper reaction (alert) limit. " + RL_DETAIL),
     "RL LSL": ("Reaction limit details", "Lower specification limit of the inspection plan. " + RL_DETAIL),
     "RL USL": ("Reaction limit details", "Upper specification limit of the inspection plan. " + RL_DETAIL),
+    "Cpk Group": ("Cpk sums", "Key of the plant, part, test and characteristic: one Cpk per group. " + CPK_SUMS),
+    "Cpk Value Count": ("Cpk sums", "Measured values of the group that day (variable characteristics, Pass or Fail). " + CPK_SUMS),
+    "Cpk Value Sum": ("Cpk sums", "Sum of those values, for the mean. " + CPK_SUMS),
+    "Cpk Range Count": ("Cpk sums", "Number of moving ranges |x(i) - x(i-1)|, values of the group in time order. "
+                        + CPK_SUMS),
+    "Cpk Range Sum": ("Cpk sums", "Sum of the moving ranges, for sigma. " + CPK_SUMS),
+    "Cpk USL": ("Cpk sums", "Upper specification limit of the last measurement of the group. " + CPK_SUMS),
+    "Cpk LSL": ("Cpk sums", "Lower specification limit of the last measurement of the group. " + CPK_SUMS),
+    "Refreshed At": (None, "Time (UTC) of the refresh that loaded the row; the latest one is the last refresh."),
 }
 
 
@@ -100,9 +168,9 @@ def m_text(t):
 
 
 def m_source():
-    lines = [f"        {m_text(x)}," for x in SQL_LINES]
-    where = ('        "WHERE posting_date >= DATE\'" & StartDate & "\' AND posting_date < DATE\'" & EndDate & "\'",')
-    lines += [where, f"        {m_text(SQL_ORDER)}"]
+    where = ('        "  WHERE posting_date >= DATE\'" & StartDate & "\' AND posting_date < DATE\'" & EndDate & "\'",')
+    lines = [where if x == WHERE_MARK else f"        {m_text(x)}," for x in SQL_LINES]
+    lines += [f"        {m_text(SQL_ORDER)}"]
     types = ",\n        ".join("{" + m_text(c[0]) + ", " + c[2] + "}" for c in COLUMNS)
     return "\n".join([
         "let",
@@ -115,20 +183,16 @@ def m_source():
         "    Source = Databricks.Query(DatabricksHost, DatabricksHttpPath,"
         " [Catalog = null, Database = null, EnableAutomaticProxyDiscovery = null]),",
         "    Result = Source(Sql),",
-        "    Typed = Table.TransformColumnTypes(Result, {",
+        "    // time of this refresh (UTC), on every row: the report shows the latest one",
+        "    RefreshedAt = DateTimeZone.RemoveZone(DateTimeZone.FixedUtcNow()),",
+        "    WithRefreshTime = Table.AddColumn(Result, \"Refreshed At\", each RefreshedAt, type datetime),",
+        "    Typed = Table.TransformColumnTypes(WithRefreshTime, {",
         "        " + types,
         "    })",
         "in",
         "    Typed",
     ])
 
-
-REFRESH_M = "\n".join([
-    "let",
-    '    Source = #table(type table [#"Refreshed At" = datetime], {{DateTimeZone.RemoveZone(DateTimeZone.FixedUtcNow())}})',
-    "in",
-    "    Source",
-])
 
 # --------------------------------------------------------------------------- measures (DAX)
 MEASURES = [  # (name, expression, format, folder, description, dynamic format)
@@ -158,7 +222,8 @@ MEASURES = [  # (name, expression, format, folder, description, dynamic format)
     ("Char Pass Bar", "[Char Pass]", None, "Bars", "Bar length = number of values, label = share of the bar.",
      '"""" & FORMAT([Char Pass %], "0.0%") & """"'),
     ("Char Fail Bar", "[Char Fail]", None, "Bars", None, '"""" & FORMAT([Char Fail %], "0.0%") & """"'),
-    ("Last Refresh", "\"Last refresh · \" & FORMAT(MAX('Refresh Info'[Refreshed At]), \"dd/mm/yyyy hh:nn\") & \" UTC\"",
+    ("Last Refresh", "\"Last refresh · \" & FORMAT(CALCULATE(MAX('Quality Tracker'[Refreshed At]), REMOVEFILTERS()),"
+     " \"dd/mm/yyyy hh:nn\") & \" UTC\"",
      None, "Report", None, None),
     # Reaction limits (page 3): a violation is a measured value that passes but is outside the reaction limits.
     ("RL Violations", "SUM('Quality Tracker'[RL Violation])", "#,0", "Reaction limits",
@@ -250,7 +315,7 @@ def write_model(out, settings, source_m=None, columns=None, extra_measures=(), e
         shutil.rmtree(model_dir)
     (model_dir / "tables").mkdir(parents=True)
     (model_dir / "database.tmdl").write_text("database 'Quality Dashboard'\n\tcompatibilityLevel: 1601\n\n")
-    names = [T, "Refresh Info"] + [t["name"] for t in extra_tables]
+    names = [T] + [t["name"] for t in extra_tables]
     (model_dir / "model.tmdl").write_text(
         "model Model\n\tculture: en-US\n\n"
         "\tannotation __PBI_TimeIntelligenceEnabled = 0\n\n"
@@ -277,16 +342,6 @@ def write_model(out, settings, source_m=None, columns=None, extra_measures=(), e
     (model_dir / "tables" / f"{T}.tmdl").write_text(
         table_tmdl(T, columns, list(MEASURES) + list(extra_measures), source_m, info=COLUMN_INFO, policy=policy))
 
-    refresh = [
-        "table 'Refresh Info'", f"\tlineageTag: {uuid.uuid4()}", "",
-        "\tcolumn 'Refreshed At'", "\t\tdataType: dateTime", "\t\tformatString: General Date", "\t\tisHidden",
-        f"\t\tlineageTag: {uuid.uuid4()}", "\t\tsummarizeBy: none", "\t\tsourceColumn: Refreshed At", "",
-        "\t\tannotation SummarizationSetBy = Automatic", "",
-        "\tpartition 'Refresh Info' = m", "\t\tmode: import", "\t\tsource =",
-        *["\t\t\t\t" + x for x in REFRESH_M.split("\n")], "",
-        "\tannotation PBI_ResultType = Table", "",
-    ]
-    (model_dir / "tables" / "Refresh Info.tmdl").write_text("\n".join(refresh) + "\n")
     return model_dir
 
 

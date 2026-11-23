@@ -514,7 +514,7 @@ def model_fields(pbix):
         from pbixray import PBIXRay
     except ImportError:
         print("pbixray is not installed: fields are checked against the expected V3 model instead")
-        tables = {T: [c[0] for c in bt.COLUMNS] + [m[0] for m in bt.MEASURES], "Refresh Info": ["Refreshed At"]}
+        tables = {T: [c[0] for c in bt.COLUMNS] + [m[0] for m in bt.MEASURES]}
     else:
         m = PBIXRay(pbix)
         tables = {}

@@ -49,7 +49,8 @@ Avant d'écrire le fichier, le script vérifie :
 ## Page d'accueil et page 4 « Cpk »
 
 `add_home_and_cpk.py` ajoute deux pages au `.pbix` qui contient les pages 1 à 3, et produit
-`out/Quality_Dashboard_V6.pbit`. Le modèle change, donc les données se rechargent à l'ouverture.
+`out/Quality_Dashboard_V9.pbit`. Le modèle change, donc les données se rechargent à l'ouverture. Si le modèle du
+`.pbix` contient déjà tous les champs utilisés, le script reconstruit seulement les deux pages et écrit un `.pbix`.
 
 - **Accueil** (concept B des propositions) : à gauche, le logo, la mission du rapport et les chiffres clés (le nombre
   d'usines et de valeurs mesurées viennent des données) ; à droite, une ligne par page qui l'ouvre, et un guide de
@@ -65,14 +66,38 @@ Le Cpk suit la méthode de la requête QDA de la spécification :
 - σ = R̄ / 1,128 ;
 - Cpk = min(USL − X̄, X̄ − LSL) / 3σ, ou le seul côté qui a une limite.
 
-Databricks renvoie des sommes par mois et par motif d'inspection. Power BI recalcule ainsi le Cpk sur les mois
-choisis. Sur des données de test, ce calcul donne exactement le même Cpk que la formule QDA.
+### Une seule table de données
 
-Le modèle gagne la table `Cpk`, en actualisation incrémentielle (12 mois, le mois en cours actualisé), ainsi que les
-tables `Cpk Threshold` et `Cpk Status`. `Quality Tracker` garde son actualisation incrémentielle (12 mois, 7 jours).
-Les filtres de la page Cpk portent sur la table `Cpk`. Ils ont les mêmes noms de groupe de synchronisation que les
-autres pages (Plant, Part, Test, Characteristic, Inspection reason). La synchronisation entre champs différents reste
-à vérifier dans Desktop.
+Les sommes du Cpk sont calculées par Databricks, dans la requête de `Quality Tracker` (7 colonnes masquées du dossier
+*Cpk sums*). Pour chaque caractéristique, motif d'inspection et jour, la dernière valeur mesurée du jour porte les
+sommes de ce jour :
+- le nombre de valeurs et leur somme ;
+- le nombre d'étendues mobiles et leur somme ;
+- l'USL et la LSL de la dernière mesure.
+
+Les autres lignes restent vides. Power BI additionne ces sommes sur les jours filtrés, puis recalcule le Cpk. Sur des
+données de test, le résultat est identique à la formule appliquée directement aux valeurs, à 10⁻¹³ près.
+
+Le modèle n'a donc qu'une table de données, `Quality Tracker` (actualisation incrémentielle : 12 mois conservés,
+7 jours actualisés). S'y ajoutent deux petites listes pour les filtres de la page Cpk :
+- `Cpk Threshold` : 1, 1,33, 1,67 et 2 ;
+- `Cpk Status` : Pass et Fail.
+
+L'heure de la dernière actualisation est la colonne `Refreshed At`, ajoutée par Power Query sur chaque ligne. La
+mesure `Last Refresh` en prend le maximum, sans tenir compte des filtres.
+
+Les filtres de la page Cpk sont ceux de la page 2, avec les mêmes champs et les mêmes groupes de synchronisation.
+Une sélection suit donc d'une page à l'autre, date comprise.
+
+Écarts avec la requête QDA, faibles dès qu'une caractéristique a quelques dizaines de valeurs :
+- Les étendues mobiles sont calculées à l'actualisation, sur la période que charge chaque requête : un mois pour
+  l'historique du service, un jour pour les 7 derniers jours, `RangeStart`–`RangeEnd` dans Desktop.
+- Quand la période filtrée commence dans une période chargée, la première étendue mobile de chaque caractéristique
+  part de la dernière valeur d'avant le filtre. QDA, lui, repart de la première valeur de la période.
+- Avec un filtre *Inspection reason*, les étendues mobiles restent celles calculées sur toutes les valeurs, quel que
+  soit le motif.
+- L'USL et la LSL sont celles de la dernière mesure de chaque période chargée. Sur plusieurs périodes, le calcul garde
+  la plus haute.
 
 ## Logo
 
@@ -104,7 +129,7 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
    ```
 4. Ajouter la page d'accueil et la page Cpk au `.pbix` qui contient les pages 1 à 3 :
    ```bash
-   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_home_and_cpk.py <V5.pbix> --range 2026-01-01 2026-02-01
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_home_and_cpk.py <V8.pbix> --range 2026-01-01 2026-02-01
    ```
 5. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
    ```bash
@@ -127,8 +152,12 @@ Databricks, et chaque règle de la version SQL devient une étape Power Query.
 | `Stop folding` | Tout ce qui suit est calculé par Power BI, et non par Databricks. |
 | `Add Month` … `Add RL USL` | Les mêmes règles que la requête SQL, une étape par règle. |
 
-Seule différence de modèle : `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que
-la version SQL le réduit à un entier avec `xxhash64`. Les noms de colonnes ne changent pas : le rapport n'est pas modifié.
+Différences de modèle :
+- `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que la version SQL le réduit à un
+  entier avec `xxhash64` ;
+- le rapport V3 n'a pas de page Cpk, donc les colonnes *Cpk sums* ne sont pas calculées.
+
+Les noms des autres colonnes ne changent pas : le rapport n'est pas modifié.
 
 ```bash
 python build_pq_template.py <V3.pbix> --range 2025-01-01 2030-01-01

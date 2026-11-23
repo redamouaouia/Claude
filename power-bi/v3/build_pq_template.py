@@ -101,14 +101,17 @@ PQ_M = """let
         if [RL Violation] = 1 then [lsl_inspection_plan] else null, type number),
     #"Add RL USL" = Table.AddColumn(#"Add RL LSL", "RL USL", each
         if [RL Violation] = 1 then [usl_inspection_plan] else null, type number),
-    #"Rename columns" = Table.RenameColumns(#"Add RL USL", {
+    // Time of this refresh (UTC), on every row: the report shows the latest one
+    RefreshedAt = DateTimeZone.RemoveZone(DateTimeZone.FixedUtcNow()),
+    #"Add Refreshed At" = Table.AddColumn(#"Add RL USL", "Refreshed At", each RefreshedAt, type datetime),
+    #"Rename columns" = Table.RenameColumns(#"Add Refreshed At", {
         {"plant", "Plant"}, {"posting_date", "Date"}, {"process", "Test"}, {"characteristic", "Characteristic"},
         {"kpc", "KPC"}, {"key_kpc", "Key KPC Code"}
     }),
     #"Keep model columns" = Table.SelectColumns(#"Rename columns", {
         "Plant", "Date", "Month", "Part", "Test", "Characteristic", "Characteristic Result", "Inspection Result",
         "Inspection ID", "Inspection Reason", "Press", "KPC", "Key KPC Code", "RL Violation",
-        "RL Time", "RL Value", "RL Low Limit", "RL High Limit", "RL LSL", "RL USL"
+        "RL Time", "RL Value", "RL Low Limit", "RL High Limit", "RL LSL", "RL USL", "Refreshed At"
     }),
     Typed = Table.TransformColumnTypes(#"Keep model columns", {
         {"Plant", type text}, {"Date", type date}, {"Test", type text}, {"Characteristic", type text},
@@ -118,8 +121,9 @@ in
     Typed"""
 
 # Inspection ID is a text key here (the SQL version hashes it to an integer with Databricks' xxhash64).
+# The V3 report has no Cpk page: the Cpk sums of the SQL version are left out.
 COLUMNS = [("Inspection ID", "string", "type text", True, None) if c[0] == "Inspection ID" else c
-           for c in bt.COLUMNS]
+           for c in bt.COLUMNS if not c[0].startswith("Cpk ")]
 # The step "Keep model columns" must list exactly the model columns, in the same order.
 _kept = PQ_M.split('#"Keep model columns"')[1].split("{", 1)[1].split("}", 1)[0]
 assert [x.strip().strip('"') for x in _kept.split(",")] == [c[0] for c in COLUMNS], "PQ_M and COLUMNS differ"

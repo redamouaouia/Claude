@@ -7,10 +7,11 @@ Usage:  python add_home_and_cpk.py <.pbix with pages 1 to 3> [settings.json] [--
   every page.
 - Cpk, laid out as the mockup of the specification: Cpk pass %, Pass & Fail donut, Pass & Fail % by part and by
   test (with the number of characteristics), Cpk of each characteristic. More filters: inspection reason,
-  Cpk threshold (1.33 by default) and Cpk pass / fail. Its filters work on the Cpk table and carry the same sync
-  group names as the filters of the other pages.
-The model gets the Cpk tables and measures of cpk_model.py, and keeps the incremental refresh of Quality Tracker,
-so the output is a template: out/Quality_Dashboard_V6.pbit (data reloaded on opening).
+  Cpk threshold (1.33 by default) and Cpk pass / fail. Its filters are those of page 2 (same fields of Quality
+  Tracker, same sync groups), so a selection follows from page to page.
+The model is the one of build_template.py (one data table, Quality Tracker, with the Cpk sums) plus the measures and
+the two lists of cpk_model.py, with the incremental refresh of Quality Tracker. A .pbix whose model already has them
+is rebuilt as a .pbix; otherwise the output is a template: out/Quality_Dashboard_V9.pbit (data reloaded on opening).
 """
 import argparse
 import copy
@@ -30,7 +31,8 @@ import restyle as R  # noqa: E402
 from restyle import B, C, N, P, S, SEL  # noqa: E402
 
 bt = cm.bt
-CPK = cm.CPK
+T = bt.T
+OUT_NAME = "Quality_Dashboard_V9"
 HOME_TITLE = "Home"
 TITLES = {"Overview": "overview", "Characteristics": "chars", "Reaction limits": "rl",
           "Reaction limit details": "rl_details"}
@@ -112,12 +114,10 @@ def build_cpk_page(src, idx, p1, page_ids):
     add(A.clone(src[idx["clear"]]))
     add(A.clone(src[idx["refresh"]]))
 
+    # The slicers of page 2: same fields, same sync groups.
     slots = D.slicer_slots("cpk")
-    sources = {"Plant": "Plant", "Part": "Part", "Test": "Test", "Characteristic": "Characteristic", "Month": "Date"}
     for (fname, label, _), (x, w) in zip(D.PAGES["cpk"]["slicers"], slots):
-        s = A.clone(src[idx["slicer:" + sources[fname]]], x=x, y=D.SLICER_Y, w=w, h=D.SLICER_H)
-        display = {"Part": "Part (inspection plan)"}.get(fname, fname)
-        add(retarget_slicer(s, CPK, fname, display, sync=None if fname == "Month" else fname))
+        add(A.clone(src[idx["slicer:" + fname]], x=x, y=D.SLICER_Y, w=w, h=D.SLICER_H))
     mx, mw = slots[-1]
     add(A.clone(src[idx["more_look"]], x=mx, w=mw))
     more_btn = add(A.clone(src[idx["more_btn"]], x=mx, w=mw))
@@ -127,7 +127,7 @@ def build_cpk_page(src, idx, p1, page_ids):
     kx, ky, kw, kh = cards["kpi"]
     kpi = add(A.clone(hero))
     A.place(kpi, kx, ky, kw, D.CPK_FIGURE_H)
-    query(kpi, {"Data": [projection(CPK, "Measure", "Cpk Pass %", "Cpk pass %")]})
+    query(kpi, {"Data": [projection(T, "Measure", "Cpk Pass %", "Cpk pass %")]})
     kpi["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(24)
     kpi["visual"]["visualContainerObjects"] = R.vco_card("Cpk pass %", "Characteristics with Cpk ≥ threshold",
                                                          pad=(12, 2, 16, 16), header=False)
@@ -135,7 +135,7 @@ def build_cpk_page(src, idx, p1, page_ids):
     donut = add(A.clone(next(v for v in p1.values() if v["visual"]["visualType"] == "donutChart")))
     A.place(donut, kx + 8, ky + D.CPK_FIGURE_H - 4, kw - 16, kh - D.CPK_FIGURE_H)
     query(donut, {"Category": [projection("Cpk Status", "Column", "Status", "Status", active=True)],
-                  "Y": [projection(CPK, "Measure", "Cpk Status Count", "Characteristics")]})
+                  "Y": [projection(T, "Measure", "Cpk Status Count", "Characteristics")]})
     donut.pop("filterConfig", None)
     for e in donut["visual"]["objects"]["dataPoint"]:
         for d in e.get("selector", {}).get("data", []):
@@ -147,14 +147,14 @@ def build_cpk_page(src, idx, p1, page_ids):
             v for v in src.values() if v["visual"]["visualType"] == "barChart"
             and R.fields_of(v)["Category"] == ["Test"])))
         A.place(bars, *cards[key])
-        query(bars, {"Category": [projection(CPK, "Column", role, role, active=True)],
-                     "Y": [projection(CPK, "Measure", "Cpk Fail Bar", "Fail"),
-                           projection(CPK, "Measure", "Cpk Pass Bar", "Pass")],
-                     "Tooltips": [projection(CPK, "Measure", "Cpk Characteristics", "Characteristics")]},
-              sort=(CPK, "Measure", "Cpk Characteristics", "Descending"))
+        query(bars, {"Category": [projection(T, "Column", role, role, active=True)],
+                     "Y": [projection(T, "Measure", "Cpk Fail Bar", "Fail"),
+                           projection(T, "Measure", "Cpk Pass Bar", "Pass")],
+                     "Tooltips": [projection(T, "Measure", "Cpk Characteristics", "Characteristics")]},
+              sort=(T, "Measure", "Cpk Characteristics", "Descending"))
         for e in bars["visual"]["objects"]["dataPoint"]:
             m = e["selector"]["metadata"]
-            e["selector"]["metadata"] = f"{CPK}.Cpk Fail Bar" if m.endswith("Fail Bar") else f"{CPK}.Cpk Pass Bar"
+            e["selector"]["metadata"] = f"{T}.Cpk Fail Bar" if m.endswith("Fail Bar") else f"{T}.Cpk Pass Bar"
         bars["visual"]["objects"]["valueAxis"] = [P(show=B(False), showAxisTitle=B(False), gridlineShow=B(False))]
         bars["visual"]["visualContainerObjects"] = R.vco_card(
             f"{role} – Cpk Pass & Fail %", "Share of characteristics · total = characteristics with a Cpk")
@@ -165,25 +165,25 @@ def build_cpk_page(src, idx, p1, page_ids):
             ("Column", "Part", "Part", 200), ("Column", "Test", "Test", 170), ("Measure", "Cpk Value", "Cpk", 70),
             ("Measure", "Cpk Threshold", "Threshold", 80), ("Measure", "Cpk Measured Values", "Measured values", 140),
             ("Measure", "Cpk Status Label", "Status", 80)]
-    query(table, {"Values": [projection(CPK, k, n, d) for k, n, d, _ in cols]},
-          sort=(CPK, "Measure", "Cpk Value", "Ascending"))
+    query(table, {"Values": [projection(T, k, n, d) for k, n, d, _ in cols]},
+          sort=(T, "Measure", "Cpk Value", "Ascending"))
     o = table["visual"]["objects"]
     o["values"] = [x for x in o["values"] if "selector" not in x] + [
         SEL({"fontColor": {"solid": {"color": {"expr": {"Measure": {
-            "Expression": {"SourceRef": {"Entity": CPK}}, "Property": "Cpk Status Color"}}}}}},
-            {"data": [{"dataViewWildcard": {"matchingOption": 1}}], "metadata": f"{CPK}.Cpk Status Label"})]
+            "Expression": {"SourceRef": {"Entity": T}}, "Property": "Cpk Status Color"}}}}}},
+            {"data": [{"dataViewWildcard": {"matchingOption": 1}}], "metadata": f"{T}.Cpk Status Label"})]
     o["columnFormatting"] = [
-        SEL({"styleHeader": B(True), "styleValues": B(True), "fontColor": C(R.NAVY)}, {"metadata": f"{CPK}.Cpk Value"}),
+        SEL({"styleHeader": B(True), "styleValues": B(True), "fontColor": C(R.NAVY)}, {"metadata": f"{T}.Cpk Value"}),
         SEL({"styleHeader": B(True), "styleValues": B(True), "dataBars": {
             "positiveColor": C("#9DC3E6"), "negativeColor": C("#9DC3E6"), "axisColor": C(R.WHITE),
-            "reverseDirection": B(False), "hideText": B(False)}}, {"metadata": f"{CPK}.Cpk Measured Values"})]
-    o["columnWidth"] = [SEL({"value": N(w)}, {"metadata": f"{CPK}.{n}"}) for _, n, _, w in cols]
+            "reverseDirection": B(False), "hideText": B(False)}}, {"metadata": f"{T}.Cpk Measured Values"})]
+    o["columnWidth"] = [SEL({"value": N(w)}, {"metadata": f"{T}.{n}"}) for _, n, _, w in cols]
     # One row per characteristic would mean tens of thousands of Cpk to compute and sort before the first row
     # shows: the table lists the 100 lowest Cpk of the current filters (a part or a test narrows it down).
     table["visual"]["visualContainerObjects"] = R.vco_card(
         "Characteristics – Cpk detail",
         f"The {cm.DETAIL_ROWS} lowest Cpk of the current filters · select a part or a test to see its characteristics")
-    table["filterConfig"] = {"filters": [top_n(CPK, "Group", "Cpk Detail Rank", cm.DETAIL_ROWS)]}
+    table["filterConfig"] = {"filters": [top_n(T, "Cpk Group", "Cpk Detail Rank", cm.DETAIL_ROWS)]}
 
     # More filters: inspection reason, Cpk threshold, Cpk pass / fail
     for role in ("overlay_look", "overlay_btn", "panel_bg", "x_look", "x_btn"):
@@ -195,8 +195,7 @@ def build_cpk_page(src, idx, p1, page_ids):
     for key in ("header", "items", "dropdown"):
         reason["visual"]["objects"][key] = copy.deepcopy(first["visual"]["objects"][key])
     reason["visual"]["visualContainerObjects"] = copy.deepcopy(first["visual"]["visualContainerObjects"])
-    add(retarget_slicer(reason, CPK, "Inspection Reason", "Inspection reason", sync="Inspection reason"),
-        idx["panel_slicer:KPC"])
+    add(reason, idx["panel_slicer:KPC"])  # the slicer of page 2 (same field and sync group), in the panel
     # No single-select mode: Power BI could then pick the first value (1.00) on its own, while nothing chosen
     # must mean 1.33 (measure Cpk Threshold).
     threshold = retarget_slicer(A.clone(first, y=first["position"]["y"] + step), "Cpk Threshold", "Threshold",
@@ -371,7 +370,7 @@ def main():
     if had_pages:
         used, missing = pkg.report_fields(defs, A.model_fields(args.pbix))
         if not missing:
-            dst = HERE / "out" / "Quality_Dashboard_V6.pbix"
+            dst = HERE / "out" / f"{OUT_NAME}.pbix"
             A.write_pbix(zin, defs, images, old, dst)
             print(f"report fields: OK ({len(used)} in the model of the .pbix)\n"
                   f"written {dst} ({dst.stat().st_size:,} bytes): home and Cpk pages rebuilt, model and data kept")
@@ -381,14 +380,14 @@ def main():
     settings = json.loads(pathlib.Path(args.settings).read_text())
     if args.range:
         settings["range_start"], settings["range_end"] = args.range
-    work = HERE / "out" / "v6"
+    work = HERE / "out" / "v9"
     work.mkdir(parents=True, exist_ok=True)
-    model_dir = bt.write_model(work, settings, extra_measures=cm.HOME_MEASURES, extra_tables=cm.extra_tables(),
-                               policy=cm.QT_POLICY)
+    model_dir = bt.write_model(work, settings, extra_measures=cm.CPK_MEASURES + cm.HOME_MEASURES,
+                               extra_tables=cm.extra_tables(), policy=cm.QT_POLICY)
     model_json = bt.model_schema(model_dir, work / "DataModelSchema.json")
     pkg.check_fields(defs, model_json)
 
-    dst = HERE / "out" / "Quality_Dashboard_V6.pbit"
+    dst = HERE / "out" / f"{OUT_NAME}.pbit"
     skip = pkg.REPLACED | {f"Report/StaticResources/RegisteredResources/{n}" for n in old}
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("Version", zin.read("Version"))
