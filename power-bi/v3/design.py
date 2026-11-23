@@ -105,14 +105,16 @@ PAGES["cpk"] = {
     "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
                 ("Characteristic", "Characteristic", 1.25), ("Month", "Month", 1.45)],
     "more_count": 3,
+    # The detail table gets the most room; Cpk pass % and the donut share one card (as the hero and the gauge of
+    # page 1), the figure on top.
     "cards": {
-        "kpi": (X0, ROW2_Y, 300, 110),
-        "donut": (X0, ROW2_Y + 126, 300, 192),
-        "bars_part": (440, ROW2_Y, 400, 318),
-        "bars_test": (856, ROW2_Y, 400, 318),
-        "table": (X0, 490, X1 - X0, 214),
+        "kpi": (X0, ROW2_Y, 300, 230),
+        "bars_part": (440, ROW2_Y, 400, 230),
+        "bars_test": (856, ROW2_Y, 400, 230),
+        "table": (X0, ROW2_Y + 230 + GAP, X1 - X0, H - 16 - (ROW2_Y + 230 + GAP)),
     },
 }
+CPK_FIGURE_H = 128  # height of the Cpk pass % figure in its card (as the hero of page 1: below, it gets cut)
 PAGES["home"] = {
     # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
     "title": "Quality Dashboard",

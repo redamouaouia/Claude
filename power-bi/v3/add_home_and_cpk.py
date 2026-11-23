@@ -124,23 +124,23 @@ def build_cpk_page(src, idx, p1, page_ids):
 
     # Cpk pass %
     hero = next(v for v in p1.values() if v["visual"]["visualType"] == "cardVisual")
+    kx, ky, kw, kh = cards["kpi"]
     kpi = add(A.clone(hero))
-    A.place(kpi, *cards["kpi"])
+    A.place(kpi, kx, ky, kw, D.CPK_FIGURE_H)
     query(kpi, {"Data": [projection(CPK, "Measure", "Cpk Pass %", "Cpk pass %")]})
-    # 110 px high (the hero of page 1 is 130): smaller figure, so that it is not cut at the bottom
-    kpi["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(22)
+    kpi["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(24)
     kpi["visual"]["visualContainerObjects"] = R.vco_card("Cpk pass %", "Characteristics with Cpk ≥ threshold",
                                                          pad=(12, 2, 16, 16), header=False)
-    # Cpk Pass & Fail donut
+    # Cpk Pass & Fail donut, under the figure, in the same card
     donut = add(A.clone(next(v for v in p1.values() if v["visual"]["visualType"] == "donutChart")))
-    A.place(donut, *cards["donut"])
+    A.place(donut, kx + 8, ky + D.CPK_FIGURE_H - 4, kw - 16, kh - D.CPK_FIGURE_H)
     query(donut, {"Category": [projection("Cpk Status", "Column", "Status", "Status", active=True)],
                   "Y": [projection(CPK, "Measure", "Cpk Status Count", "Characteristics")]})
     donut.pop("filterConfig", None)
     for e in donut["visual"]["objects"]["dataPoint"]:
         for d in e.get("selector", {}).get("data", []):
             d["scopeId"]["Comparison"]["Left"] = field("Cpk Status", "Column", "Status")
-    donut["visual"]["visualContainerObjects"] = R.vco_card("Cpk Pass & Fail", "Characteristics by status")
+    donut["visual"]["visualContainerObjects"] = R.vco_plain({"general": [P(keepLayerOrder=B(True))]})
     # Pass & Fail % by part and by test
     for key, role in (("bars_part", "Part"), ("bars_test", "Test")):
         bars = add(A.clone(src[idx["barChart"]] if role == "Part" else next(
@@ -255,6 +255,7 @@ def strip_new_pages(defs, meta):
     for k in [k for k in defs if "/visuals/" in k]:
         if A.R.link_of(defs[k]).get("navigationSection") in gone:
             del defs[k]
+    return gone
 
 
 def main():
@@ -267,7 +268,7 @@ def main():
     zin = zipfile.ZipFile(args.pbix)
     defs = pkg.definitions(zin)
     meta = defs["pages/pages.json"]
-    strip_new_pages(defs, meta)
+    had_pages = bool(strip_new_pages(defs, meta))
     page_keys = {}
     for pid in meta["pageOrder"]:
         title = defs[f"pages/{pid}/page.json"]["displayName"]
@@ -364,6 +365,18 @@ def main():
         sys.exit("report check failed")
     print(f"report checks: OK ({len(meta['pageOrder'])} pages, {sum(1 for k in defs if '/visuals/' in k)} visuals, "
           f"{len(defs['bookmarks/bookmarks.json']['items'])} bookmarks)")
+
+    # A .pbix that already has these pages, and whose model has every field they use: rebuilt pages, same model and
+    # data, so the output is a .pbix (no reload). Otherwise, a template with the model below.
+    if had_pages:
+        used, missing = pkg.report_fields(defs, A.model_fields(args.pbix))
+        if not missing:
+            dst = HERE / "out" / "Quality_Dashboard_V6.pbix"
+            A.write_pbix(zin, defs, images, old, dst)
+            print(f"report fields: OK ({len(used)} in the model of the .pbix)\n"
+                  f"written {dst} ({dst.stat().st_size:,} bytes): home and Cpk pages rebuilt, model and data kept")
+            return
+        print(f"model of the .pbix lacks {len(missing)} fields: building a template instead")
 
     settings = json.loads(pathlib.Path(args.settings).read_text())
     if args.range:

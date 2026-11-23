@@ -35,6 +35,15 @@ def definitions(zin):
 
 def check_fields(defs, model_json):
     """Every column or measure the report uses must exist in the model."""
+    used, missing = report_fields(defs, model_json)
+    if missing:
+        sys.exit("fields used by the report but missing from the model:\n" +
+                 "\n".join(f"  {e}[{p}] in {n}" for e, p, n in sorted(missing)))
+    print(f"report fields: OK ({len(used)} distinct columns and measures found in the model)")
+
+
+def report_fields(defs, model_json):
+    """(fields used by the report, those missing from the model) as sets of (table, field[, file])."""
     fields = {t["name"]: {c["name"] for c in t.get("columns", [])} | {m["name"] for m in t.get("measures", [])}
               for t in model_json["model"]["tables"]}
     used, missing = set(), set()
@@ -49,7 +58,4 @@ def check_fields(defs, model_json):
                     used.add((entity, o["Property"]))
                     if o["Property"] not in fields.get(entity, ()):
                         missing.add((entity, o["Property"], name))
-    if missing:
-        sys.exit("fields used by the report but missing from the model:\n" +
-                 "\n".join(f"  {e}[{p}] in {n}" for e, p, n in sorted(missing)))
-    print(f"report fields: OK ({len(used)} distinct columns and measures found in the model)")
+    return used, missing
