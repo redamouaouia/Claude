@@ -189,8 +189,60 @@ def tmdl_expr(text, indent):
     return "", [pad + line for line in text.split("\n")]
 
 
-def write_model(out, settings, source_m=None, columns=None):
-    """TMDL model in out/model. source_m / columns replace the Quality Tracker query and column list (variants)."""
+def table_tmdl(name, columns, measures, source_m, info=None, sort_by=None, policy=None):
+    """TMDL of one import table.
+    columns: (name, TMDL dataType, M type, hidden, format); measures: tuples as in MEASURES;
+    info: {column: (display folder, description)}; sort_by: {column: column it is sorted by};
+    policy: incremental refresh (rolling granularity, rolling periods, incremental granularity, incremental periods)."""
+    info, sort_by = info or {}, sort_by or {}
+    lines = [f"table {tmdl_name(name)}", f"\tlineageTag: {uuid.uuid4()}", ""]
+    for mname, expr, fmt, folder, desc, dyn in measures:
+        if desc:
+            lines.append(f"\t/// {desc}")
+        inline, below = tmdl_expr(expr, 3)
+        lines.append(f"\tmeasure {tmdl_name(mname)} ={inline}")
+        lines += below
+        if fmt:
+            lines.append(f"\t\tformatString: {fmt}")
+        lines.append(f"\t\tdisplayFolder: {folder}")
+        lines.append(f"\t\tlineageTag: {uuid.uuid4()}")
+        if dyn:
+            lines += ["", f"\t\tformatStringDefinition = {dyn}"]
+        lines.append("")
+    for cname, dtype, m_type, hidden, fmt in columns:
+        folder, desc = info.get(cname, (None, None))
+        if desc:
+            lines.append(f"\t/// {desc}")
+        lines.append(f"\tcolumn {tmdl_name(cname)}")
+        lines.append(f"\t\tdataType: {dtype}")
+        if fmt:
+            lines.append(f"\t\tformatString: {fmt}")
+        if hidden:
+            lines.append("\t\tisHidden")
+        if folder:
+            lines.append(f"\t\tdisplayFolder: {folder}")
+        lines += [f"\t\tlineageTag: {uuid.uuid4()}", "\t\tsummarizeBy: none", f"\t\tsourceColumn: {cname}"]
+        if cname in sort_by:
+            lines.append(f"\t\tsortByColumn: {tmdl_name(sort_by[cname])}")
+        lines += ["", "\t\tannotation SummarizationSetBy = Automatic", ""]
+        if m_type == "type date":
+            lines[-1:-1] = ["\t\tannotation UnderlyingDateTimeDataType = Date", ""]
+    if policy:
+        lines += ["\trefreshPolicy", "\t\tpolicyType: basic", f"\t\trollingWindowGranularity: {policy[0]}",
+                  f"\t\trollingWindowPeriods: {policy[1]}", f"\t\tincrementalGranularity: {policy[2]}",
+                  f"\t\tincrementalPeriods: {policy[3]}", "\t\tsourceExpression ="]
+        lines += ["\t\t\t\t" + x for x in source_m.split("\n")]
+        lines.append("")
+    lines += [f"\tpartition {tmdl_name(name)} = m", "\t\tmode: import", "\t\tsource ="]
+    lines += ["\t\t\t\t" + x for x in source_m.split("\n")]
+    lines += ["", "\tannotation PBI_ResultType = Table", ""]
+    return "\n".join(lines) + "\n"
+
+
+def write_model(out, settings, source_m=None, columns=None, extra_measures=(), extra_tables=(), policy=None):
+    """TMDL model in out/model. source_m / columns replace the Quality Tracker query and column list (variants).
+    extra_measures go to Quality Tracker, extra_tables are table_tmdl() keyword arguments, policy is the
+    incremental refresh policy of Quality Tracker."""
     source_m = source_m or m_source()
     columns = columns or COLUMNS
     model_dir = out / "model"
@@ -198,12 +250,15 @@ def write_model(out, settings, source_m=None, columns=None):
         shutil.rmtree(model_dir)
     (model_dir / "tables").mkdir(parents=True)
     (model_dir / "database.tmdl").write_text("database 'Quality Dashboard'\n\tcompatibilityLevel: 1601\n\n")
+    names = [T, "Refresh Info"] + [t["name"] for t in extra_tables]
     (model_dir / "model.tmdl").write_text(
         "model Model\n\tculture: en-US\n\n"
         "\tannotation __PBI_TimeIntelligenceEnabled = 0\n\n"
         '\tannotation PBI_QueryOrder = ["DatabricksHost","DatabricksHttpPath","RangeStart","RangeEnd",'
-        '"Quality Tracker","Refresh Info"]\n\n'
-        "ref table 'Quality Tracker'\nref table 'Refresh Info'\n\n")
+        + ",".join(f'"{n}"' for n in names) + "]\n\n"
+        + "".join(f"ref table {tmdl_name(n)}\n" for n in names) + "\n")
+    for t in extra_tables:
+        (model_dir / "tables" / f"{t['name']}.tmdl").write_text(table_tmdl(**t))
 
     rs = settings["range_start"].split("-")
     re_ = settings["range_end"].split("-")
@@ -219,40 +274,8 @@ def write_model(out, settings, source_m=None, columns=None):
                 f"\tlineageTag: {uuid.uuid4()}", "", f"\tannotation PBI_ResultType = {typ}", ""]
     (model_dir / "expressions.tmdl").write_text("\n".join(exp) + "\n")
 
-    lines = [f"table {tmdl_name(T)}", f"\tlineageTag: {uuid.uuid4()}", ""]
-    for name, expr, fmt, folder, desc, dyn in MEASURES:
-        if desc:
-            lines.append(f"\t/// {desc}")
-        inline, below = tmdl_expr(expr, 3)
-        lines.append(f"\tmeasure {tmdl_name(name)} ={inline}")
-        lines += below
-        if fmt:
-            lines.append(f"\t\tformatString: {fmt}")
-        lines.append(f"\t\tdisplayFolder: {folder}")
-        lines.append(f"\t\tlineageTag: {uuid.uuid4()}")
-        if dyn:
-            lines += ["", f"\t\tformatStringDefinition = {dyn}"]
-        lines.append("")
-    for name, dtype, m_type, hidden, fmt in columns:
-        folder, desc = COLUMN_INFO.get(name, (None, None))
-        if desc:
-            lines.append(f"\t/// {desc}")
-        lines.append(f"\tcolumn {tmdl_name(name)}")
-        lines.append(f"\t\tdataType: {dtype}")
-        if fmt:
-            lines.append(f"\t\tformatString: {fmt}")
-        if hidden:
-            lines.append("\t\tisHidden")
-        if folder:
-            lines.append(f"\t\tdisplayFolder: {folder}")
-        lines += [f"\t\tlineageTag: {uuid.uuid4()}", "\t\tsummarizeBy: none", f"\t\tsourceColumn: {name}", "",
-                  "\t\tannotation SummarizationSetBy = Automatic", ""]
-        if m_type == "type date":
-            lines[-1:-1] = ["\t\tannotation UnderlyingDateTimeDataType = Date", ""]
-    lines += [f"\tpartition {tmdl_name(T)} = m", "\t\tmode: import", "\t\tsource ="]
-    lines += ["\t\t\t\t" + x for x in source_m.split("\n")]
-    lines += ["", "\tannotation PBI_ResultType = Table", ""]
-    (model_dir / "tables" / f"{T}.tmdl").write_text("\n".join(lines) + "\n")
+    (model_dir / "tables" / f"{T}.tmdl").write_text(
+        table_tmdl(T, columns, list(MEASURES) + list(extra_measures), source_m, info=COLUMN_INFO, policy=policy))
 
     refresh = [
         "table 'Refresh Info'", f"\tlineageTag: {uuid.uuid4()}", "",

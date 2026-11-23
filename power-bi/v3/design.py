@@ -21,8 +21,9 @@ ROW2_Y, ROW2_H = 156, 254
 ROW3_Y, ROW3_H = 424, 280
 GAP = 16
 
-NAV = [("Overview", "overview"), ("Characteristics", "chars"), ("Reaction limits", "rl")]
+NAV = [("Overview", "overview"), ("Characteristics", "chars"), ("Reaction limits", "rl"), ("Cpk", "cpk")]
 NAV_TILES = {k: (10, 96 + i * 74, 76, 64) for i, (_, k) in enumerate(NAV)}
+BADGE = (20, 16, 56, 56)  # company symbol at the top of the rail: the Home button of every page
 CLEAR_TILE = (10, 636, 76, 64)
 REFRESH_PILL = (966, 22, 290, 26)
 DATE_W, MORE_W = 250, 132  # fixed widths: two date boxes, and the full "More filters · N" label
@@ -96,6 +97,37 @@ PAGES = {
         },
     },
 }
+PAGES["cpk"] = {
+    # Page 4, laid out as the mockup of the specification. Its rules are still to be validated.
+    "title": "Cpk",
+    "status": "To be validated",
+    "question": "Which parts, tests and characteristics are capable?",
+    "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
+                ("Characteristic", "Characteristic", 1.25), ("Month", "Month", 1.45)],
+    "more_count": 3,
+    "cards": {
+        "kpi": (X0, ROW2_Y, 300, 110),
+        "donut": (X0, ROW2_Y + 126, 300, 192),
+        "bars_part": (440, ROW2_Y, 400, 318),
+        "bars_test": (856, ROW2_Y, 400, 318),
+        "table": (X0, 490, X1 - X0, 214),
+    },
+}
+PAGES["home"] = {
+    # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
+    "title": "Quality Dashboard",
+    "question": "Plant Visual Management",
+    "nav": "home",
+    "slicers": [],
+    "cards": {},
+}
+HOME_HERO = (RAIL_W, 0, 520, H)
+HOME_ROWS = {key: (648, 96 + i * 112, 608, 100) for i, (_, key) in enumerate(NAV)}  # one row per page
+HOME_GUIDE = (648, 548, 608, 156)
+HOME_FACTS = [("plants", "Plants"), ("months", None), ("values", "Home Measured Values"), ("daily", None)]
+HOME_FACT_Y = {key: 470 + i * 40 for i, (key, _) in enumerate(HOME_FACTS)}  # one line per fact
+HOME_FACT_VALUE = (136, 130, 32)  # x, width, height of a live value (Power BI card) in the facts list
+HOME_REFRESH = (138, 664, 300, 26)
 CONTEXT = (X0, SLICER_Y, 820, SLICER_H)          # details page: the part chosen with "Details"
 BACK = (X1 - MORE_W, SLICER_Y, MORE_W, SLICER_H)  # details page: back to Reaction limits
 
@@ -107,10 +139,10 @@ def slicer_slots(page):
         return [(X1 - MORE_W, MORE_W)]
     gap = 10
     free = X1 - X0 - gap * len(items) - DATE_W - MORE_W
-    flex = sum(w for name, _, w in items if name != "Date")
+    flex = sum(w for name, _, w in items if name not in ("Date", "Month"))
     out, x = [], X0
     for name, _, w in items:
-        width = DATE_W if name == "Date" else round(free * w / flex, 1)
+        width = DATE_W if name in ("Date", "Month") else round(free * w / flex, 1)
         out.append((round(x, 1), width))
         x += width + gap
     out.append((round(x, 1), MORE_W))
@@ -123,6 +155,8 @@ ICONS = {
                 '<rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
     "chars": '<rect x="2.5" y="7.5" width="19" height="9" rx="2"/><path d="M6.5 7.5v3.2M10 7.5v2M13.5 7.5v3.2M17 7.5v2"/>',
     "rl": '<path d="M2.5 8.5h19" stroke-dasharray="2.2 2.2"/><path d="M6 20.5v-6M10 20.5v-8.5M14 20.5v-16M18 20.5v-6.5"/>',
+    "cpk": '<path d="M2.5 19.5h19"/><path d="M4 19.5c3.5 0 4.3-12 8-12s4.5 12 8 12"/>'
+           '<path d="M5.5 4.5v15M18.5 4.5v15" stroke-dasharray="2 2"/>',
     "clear": '<path d="M4 5h15l-5.8 6.6V17l-3.4 1.8v-7.2z"/><path d="M16.6 14.6l4 4M20.6 14.6l-4 4"/>',
     "glyph": '<path d="M3 6.5h18M3 17.5h18" stroke-dasharray="2.2 2.2"/>'
              '<path d="M3 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0 2.4 2.6 3.6 1.4"/>',
@@ -210,6 +244,13 @@ def page_html(page):
     rx, ry, rw, rh = REFRESH_PILL
     ticks = "".join(f'<line x1="{8 - (5 if i % 5 == 0 else 2.5)}" x2="8" y1="{i * 8 + .5}" y2="{i * 8 + .5}"/>'
                     for i in range(0, H // 8 + 1))
+    status = ""
+    if spec.get("status"):
+        width = 15 + 17.5 * len(spec["title"])  # title in Barlow Semi Condensed 33 px
+        status = f'<div class="status" style="left:{X0 + width:.0f}px">{html.escape(spec["status"])}</div>'
+    header = (f'<div class="band">{tolerance_motif()}</div>{eyebrow_html()}'
+              f'<h1>{html.escape(spec["title"])}</h1>{status}<div class="q">{html.escape(spec["question"])}</div>'
+              f'<div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>{labels}{plates}')
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
 <style>
@@ -269,17 +310,146 @@ def page_html(page):
             color: rgba(255,255,255,.62); white-space: nowrap; overflow: hidden; }}
   .plate {{ position: absolute; border-radius: 16px; background: #fff;
            box-shadow: 0 1px 2px rgba(11,42,91,.07), 0 10px 28px -6px rgba(11,42,91,.16), 0 2px 8px rgba(11,42,91,.04); }}
+  .homelbl {{ position: absolute; left: 0; width: {RAIL_W}px; top: 76px; text-align: center; font-size: 8px;
+             font-weight: 600; letter-spacing: .16em; color: rgba(255,255,255,.55); }}
+  .homelbl.on {{ color: #fff; }}
+  .badge.on {{ box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 3px rgba(111,168,232,.45),
+                         0 12px 24px -10px rgba(0,0,0,.6); }}
+  .status {{ position: absolute; top: 36px; height: 20px; padding: 0 10px; border-radius: 10px; display: flex;
+            align-items: center; font-size: 9px; font-weight: 600; letter-spacing: .04em; color: #FFD9BF;
+            background: rgba(237,125,49,.18); box-shadow: inset 0 0 0 1px rgba(237,125,49,.75); }}
+{HOME_CSS if page == "home" else ""}
 </style></head><body>
   <div class="dots"></div>
-  <div class="band">{tolerance_motif()}</div>
+  {home_body() if page == "home" else header}
   <div class="rail"></div>
   <svg class="ruler" width="8" height="{H}">{ticks}</svg>
-  {badge_html()}
+  {badge_html().replace('class="badge"', 'class="badge on"') if page == "home" else badge_html()}
+  <div class="homelbl{" on" if page == "home" else ""}">HOME</div>
   {tiles}
-  {eyebrow_html()}
-  <h1>{html.escape(spec["title"])}</h1>
-  <div class="q">{html.escape(spec["question"])}</div>
-  <div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>
-  {labels}
-  {plates}
 </body></html>'''
+
+
+HOME_CSS = f"""
+  .dots {{ top: 0; }}
+  .hero {{ position: absolute; left: {HOME_HERO[0]}px; top: 0; width: {HOME_HERO[2]}px; height: {H}px; overflow: hidden;
+          background: radial-gradient(520px 360px at 20% 0%, rgba(110,170,235,.35), transparent 70%),
+                      radial-gradient(420px 300px at 100% 100%, rgba(47,110,186,.35), transparent 72%),
+                      linear-gradient(160deg, #0A2756 0%, #0E336D 55%, #133F80 100%); }}
+  .hero .motif {{ position: absolute; left: -30px; top: 318px; transform: scale(1.22); transform-origin: left top; opacity: .9; }}
+  .hero .logo {{ position: absolute; left: 40px; top: 46px; height: 34px; }}
+  .hero .kicker {{ position: absolute; left: 42px; top: 120px; font-size: 9.5px; font-weight: 600; letter-spacing: .2em;
+                  color: rgba(255,255,255,.56); text-transform: uppercase; }}
+  .hero h1 {{ left: 40px; top: 148px; font-size: 54px; line-height: .95; }}
+  .hero .lead {{ position: absolute; left: 42px; top: 270px; width: 420px; font-size: 12.5px; line-height: 1.6;
+                color: rgba(255,255,255,.75); }}
+  .fact {{ position: absolute; left: 42px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
+          color: rgba(255,255,255,.82); }}
+  .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; }}
+  .fact span {{ position: absolute; left: 140px; white-space: nowrap; }}
+  .hpill {{ position: absolute; left: {HOME_REFRESH[0] - RAIL_W}px; top: {HOME_REFRESH[1]}px; width: {HOME_REFRESH[2]}px;
+           height: {HOME_REFRESH[3]}px; border-radius: 13px; background: rgba(255,255,255,.10);
+           box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); display: flex; align-items: center; padding-left: 10px; }}
+  .start {{ position: absolute; left: 650px; top: 34px; }}
+  .start b {{ display: block; font: 700 21px "Barlow Semi Condensed", "Segoe UI", sans-serif; color: #0B2A5B; }}
+  .start span {{ display: block; margin-top: 3px; font-size: 10px; color: #7A889C; }}
+  .row {{ position: absolute; display: flex; align-items: center; gap: 18px; padding: 0 18px; }}
+  .row .idx {{ font: 700 10.5px Inter, sans-serif; color: #A3B1C6; }}
+  .row .name {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #0B2A5B; margin-top: 1px; }}
+  .row .qq {{ font-size: 9.5px; color: #5A6B85; margin-top: 3px; }}
+  .row .hl {{ font-size: 8.8px; color: #7A889C; margin-top: 6px; }}
+  .row .go {{ width: 34px; height: 34px; border-radius: 17px; background: #0B2A5B; color: #fff; display: grid;
+             place-items: center; font-size: 15px; flex: none; }}
+  .row .tbv {{ display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 8px; font: 600 8px Inter;
+              color: #B4541B; background: #FDEBDD; vertical-align: 2px; }}
+  .guide {{ position: absolute; padding: 16px 20px; }}
+  .guide b.t {{ font: 600 12px "Segoe UI Semibold", Inter, sans-serif; color: #0B2A5B; }}
+  .legend {{ display: flex; gap: 22px; margin-top: 12px; font-size: 9.5px; color: #1B2A41; }}
+  .legend i {{ display: inline-block; width: 18px; height: 8px; border-radius: 4px; margin-right: 7px; vertical-align: -1px; }}
+  .defs {{ margin-top: 12px; font-size: 9px; line-height: 1.75; color: #5A6B85; }}
+  .defs b {{ color: #1B2A41; }}
+"""
+
+HOME_PAGES = {  # page key: (question, highlights)
+    "overview": ("How many inspections pass, and where do they fail?",
+                 "Pass % vs the 95 % target · Pass & Fail by part and by test · where inspections fail"),
+    "chars": ("How do measured values evolve, and which characteristics fail?",
+              "Measured values per day · Pass & Fail % by part and by test · results per characteristic"),
+    "rl": ("Where are measurements getting close to the limit?",
+           "Violations per day · top 15 characteristics · details: value, limits, tolerance"),
+    "cpk": ("Which parts, tests and characteristics are capable?",
+            "Cpk pass % · Cpk by part and by test · Cpk of each characteristic"),
+}
+
+
+def mini_preview(key, w, h):
+    """Small drawing of a page, in its colours (decoration only, not data)."""
+    blue, orange, rl, navy = "#2F6EBA", "#ED7D31", "#1F4E79", "#0B2A5B"
+    wave = [.62, .58, .66, .6, .7, .45, .6, .62, .64, .57, .66, .7, .63]
+
+    def line(vals, x0, y0, ww, hh, color, area=True):
+        pts = [(x0 + i * ww / (len(vals) - 1), y0 + hh - v * hh) for i, v in enumerate(vals)]
+        d = "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in pts)
+        a = f'<path d="{d} L{x0 + ww:.1f} {y0 + hh} L{x0} {y0 + hh} Z" fill="{color}" fill-opacity=".12"/>' if area else ""
+        return a + f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.8" stroke-linejoin="round"/>'
+
+    s = f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}"><rect width="{w}" height="{h}" rx="9" fill="#F3F6FB"/>'
+    if key == "overview":
+        s += (f'<path d="M14 {h - 14} A20 20 0 0 1 54 {h - 14}" fill="none" stroke="#DCE5F2" stroke-width="7"/>'
+              f'<path d="M14 {h - 14} A20 20 0 0 1 49 {h - 26}" fill="none" stroke="{blue}" stroke-width="7"/>'
+              f'<path d="M66 12H{w - 10}" stroke="{navy}" stroke-opacity=".4" stroke-dasharray="3 3"/>'
+              + line(wave, 66, 16, w - 76, h - 28, blue))
+    elif key == "chars":
+        s += line(wave[::-1], 10, 8, w - 20, (h - 16) * .5, blue)
+        for i, frac in enumerate((.9, .74, .6)):
+            y = 10 + (h - 16) * .6 + i * 7
+            s += (f'<rect x="10" y="{y:.0f}" width="{(w - 20) * frac * .8:.0f}" height="4.5" rx="2" fill="{blue}"/>'
+                  f'<rect x="{10 + (w - 20) * frac * .8:.0f}" y="{y:.0f}" width="{(w - 20) * .1:.0f}" height="4.5" rx="2" fill="{orange}"/>')
+    elif key == "rl":
+        s += line([.2, .5, .45, .8, .62, .9, .55, .7, .4, .65], 10, 10, w * .55, h - 20, rl, area=False)
+        x0, tw, th = w * .62, w * .38 - 10, h - 20
+        s += (f'<rect x="{x0:.0f}" y="10" width="{tw * .55:.0f}" height="{th:.0f}" rx="3" fill="{rl}"/>'
+              f'<rect x="{x0 + tw * .58:.0f}" y="10" width="{tw * .42:.0f}" height="{th * .55:.0f}" rx="3" fill="#3E6C9E"/>'
+              f'<rect x="{x0 + tw * .58:.0f}" y="{10 + th * .58:.0f}" width="{tw * .42:.0f}" height="{th * .42:.0f}" rx="3" fill="#7C9CC6"/>')
+    else:
+        cx, base = w * .5, h - 12
+        s += (f'<path d="M10 {base} C{cx - 30} {base} {cx - 22} 12 {cx} 12 S{cx + 30} {base} {w - 10} {base}" fill="{blue}" '
+              f'fill-opacity=".14" stroke="{blue}" stroke-width="1.8"/>'
+              f'<path d="M{w * .16:.0f} 8V{base}M{w * .84:.0f} 8V{base}" stroke="{orange}" stroke-dasharray="3 3"/>')
+    return s + "</svg>"
+
+
+def home_body():
+    logo = BRAND / "logo_white.png"
+    logo_html = (f'<img class="logo" src="{_data_uri(logo)}" alt="">' if logo.exists()
+                 else '<div class="kicker" style="top:56px">OPmobility</div>')
+    facts = {"plants": ("", "plants"), "months": ("12 months", "rolling history"),
+             "values": ("", "measured values"), "daily": ("Daily", "refresh from Databricks")}
+    fact_html = "".join(
+        f'<div class="fact" style="top:{HOME_FACT_Y[k]}px"><b>{facts[k][0]}</b><span>{facts[k][1]}</span></div>'
+        for k, _ in HOME_FACTS)
+    rows = ""
+    for i, (label, key) in enumerate(NAV):
+        x, y, w, h = HOME_ROWS[key]
+        question, highlights = HOME_PAGES[key]
+        tbv = '<span class="tbv">To be validated</span>' if PAGES[key].get("status") else ""
+        rows += (f'<div class="plate row" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
+                 f'{mini_preview(key, 150, 76)}<div style="flex:1"><div class="idx">0{i + 1}</div>'
+                 f'<div class="name">{html.escape(label)}{tbv}</div><div class="qq">{html.escape(question)}</div>'
+                 f'<div class="hl">{html.escape(highlights)}</div></div><div class="go">›</div></div>')
+    gx, gy, gw, gh = HOME_GUIDE
+    guide = (f'<div class="plate guide" style="left:{gx}px;top:{gy}px;width:{gw}px;height:{gh}px">'
+             f'<b class="t">Reading guide</b><div class="legend">'
+             f'<span><i style="background:#2F6EBA"></i>Pass</span><span><i style="background:#ED7D31"></i>Fail</span>'
+             f'<span><i style="background:#1F4E79"></i>Reaction limits</span>'
+             f'<span><i style="width:22px;height:0;border-top:2px dashed #0B2A5B;border-radius:0"></i>Target 95 %</span></div>'
+             f'<div class="defs"><b>Inspection</b> one result per test on a part · <b>Measured value</b> one characteristic '
+             f'measured once<br><b>Violation</b> a value that passes but is outside the reaction (alert) limits · '
+             f'<b>Cpk</b> process capability, min(USL − mean, mean − LSL) / 3σ<br>'
+             f'Results not assessed or not evaluated are left out of the percentages</div></div>')
+    return (f'<div class="hero">{tolerance_motif()}{logo_html}<div class="kicker">Plant Visual Management</div>'
+            f'<h1>Quality<br>Dashboard</h1><div class="lead">The daily review of quality results in series production: '
+            f'inspections, measured values, reaction limits and capability, for every plant.</div>{fact_html}'
+            f'<div class="hpill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div></div>'
+            f'<div class="start"><b>Where do you want to start?</b><span>Each page answers one question. '
+            f'Filters follow you from page to page.</span></div>{rows}{guide}')
