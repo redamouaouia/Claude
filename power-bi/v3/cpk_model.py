@@ -121,13 +121,16 @@ CPK_MEASURES = [  # (name, expression, format, folder, description, dynamic form
      "Mean of the measured values.", None),
     ("Cpk Sigma", f"DIVIDE(DIVIDE(SUM({C}[Sum Moving Range]), SUM({C}[Moving Ranges])), 1.128)", "0.####",
      "Cpk\\Details", "Short-term standard deviation: mean moving range / 1.128.", None),
+    # Written for speed: plain sums and DIVIDE (blank when sigma is 0 or missing), one pass, no nested measures.
     ("Cpk Value",
-     f"VAR sigma = [Cpk Sigma]\nVAR xbar = [Cpk X Bar]\nVAR usl = MAX({C}[USL])\nVAR lsl = MAX({C}[LSL])\nRETURN\n"
-     f"\tIF(\n\t\tHASONEVALUE({C}[Group]) && sigma > 0,\n\t\tSWITCH(\n\t\t\tTRUE(),\n"
-     "\t\t\tNOT ISBLANK(usl) && NOT ISBLANK(lsl), MIN(usl - xbar, xbar - lsl) / (3 * sigma),\n"
-     "\t\t\tNOT ISBLANK(usl), (usl - xbar) / (3 * sigma),\n"
-     "\t\t\tNOT ISBLANK(lsl), (xbar - lsl) / (3 * sigma)\n\t\t)\n\t)",
-     "0.00", "Cpk", "Cpk of one plant, part, test and characteristic, on the months selected.", None),
+     f"VAR xbar = DIVIDE(SUM({C}[Sum Value]), SUM({C}[Values]))\n"
+     f"VAR sigma = DIVIDE(SUM({C}[Sum Moving Range]), SUM({C}[Moving Ranges])) / 1.128\n"
+     f"VAR usl = MAX({C}[USL])\nVAR lsl = MAX({C}[LSL])\n"
+     "VAR up = DIVIDE(usl - xbar, 3 * sigma)\nVAR down = DIVIDE(xbar - lsl, 3 * sigma)\nRETURN\n"
+     "\tSWITCH(\n\t\tTRUE(),\n\t\tISBLANK(usl) && ISBLANK(lsl), BLANK(),\n\t\tISBLANK(usl), down,\n"
+     "\t\tISBLANK(lsl), up,\n\t\tMIN(up, down)\n\t)",
+     "0.00", "Cpk", "Cpk of one plant, part, test and characteristic (one Cpk group), on the months selected.",
+     None),
     ("Cpk Threshold", "SELECTEDVALUE('Cpk Threshold'[Threshold], 1.33)", "0.00", "Cpk",
      "Threshold chosen in More filters, 1.33 when none is chosen.", None),
     ("Cpk Characteristics", f"COUNTROWS({GROUPS})", "#,0", "Cpk", "Characteristics that have a Cpk.", None),
@@ -148,11 +151,15 @@ CPK_MEASURES = [  # (name, expression, format, folder, description, dynamic form
      "Colour of the status label.", None),
     ("Cpk Status Count", "SWITCH(SELECTEDVALUE('Cpk Status'[Status]), \"Pass\", [Cpk Pass], \"Fail\", [Cpk Fail])",
      "#,0", "Cpk", "Characteristics per status, for the donut.", None),
-    ("Cpk Status Visible",
-     "VAR s = [Cpk Status]\nRETURN\n\tIF(\n\t\tNOT ISBLANK(s) && (NOT ISFILTERED('Cpk Status'[Status]) || s IN VALUES('Cpk Status'[Status])),\n"
-     "\t\t1,\n\t\t0\n\t)", "0", "Cpk\\Details", "1 when the characteristic has the status chosen (filter of the detail table).",
-     None),
+    # Detail table: Top 100 by this measure = the 100 lowest Cpk with the status chosen (Pass / Fail filter or
+    # donut). Blank otherwise, so those characteristics drop out before the Top 100 is taken.
+    ("Cpk Detail Rank",
+     "VAR c = [Cpk Value]\nVAR s = IF(c >= [Cpk Threshold], \"Pass\", \"Fail\")\nRETURN\n"
+     "\tIF(\n\t\tNOT ISBLANK(c) && (NOT ISFILTERED('Cpk Status'[Status]) || s IN VALUES('Cpk Status'[Status])),\n"
+     "\t\t-c\n\t)", "0.00", "Cpk\\Details",
+     "Minus the Cpk when the status is the one chosen: the detail table keeps its Top 100.", None),
 ]
+DETAIL_ROWS = 100  # characteristics listed in the detail table: the lowest Cpk first
 
 HOME_MEASURES = [
     ("Plants", "DISTINCTCOUNT('Quality Tracker'[Plant])", "#,0", "Report", "Plants in the data.", None),

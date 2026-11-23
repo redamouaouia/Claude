@@ -62,13 +62,18 @@ def query(v, roles, sort=None):
         q.pop("sortDefinition", None)
 
 
-def measure_equals(entity, measure, literal):
-    return {"name": "Filter" + A.new_name(), "field": field(entity, "Measure", measure), "type": "Advanced",
-            "filter": {"Version": 2, "From": [{"Name": "c", "Entity": entity, "Type": 0}],
-                       "Where": [{"Condition": {"Comparison": {
-                           "ComparisonKind": 0,
-                           "Left": {"Measure": {"Expression": {"SourceRef": {"Source": "c"}}, "Property": measure}},
-                           "Right": {"Literal": {"Value": literal}}}}}]},
+def top_n(entity, column, measure, n):
+    """Visual filter: the n values of `column` with the highest `measure` (rows where it is blank drop out)."""
+    col = {"Column": {"Expression": {"SourceRef": {"Source": "c"}}, "Property": column}}
+    sub = {"Version": 2, "From": [{"Name": "c", "Entity": entity, "Type": 0}], "Select": [dict(col, Name="field")],
+           "OrderBy": [{"Direction": 2, "Expression": {"Measure": {
+               "Expression": {"SourceRef": {"Source": "c"}}, "Property": measure}}}], "Top": n}
+    return {"name": "Filter" + A.new_name(), "field": field(entity, "Column", column), "type": "TopN",
+            "filter": {"Version": 2,
+                       "From": [{"Name": "subquery", "Expression": {"Subquery": {"Query": sub}}, "Type": 2},
+                                {"Name": "c", "Entity": entity, "Type": 0}],
+                       "Where": [{"Condition": {"In": {"Expressions": [col],
+                                                       "Table": {"SourceRef": {"Source": "subquery"}}}}}]},
             "howCreated": "User"}
 
 
@@ -122,6 +127,8 @@ def build_cpk_page(src, idx, p1, page_ids):
     kpi = add(A.clone(hero))
     A.place(kpi, *cards["kpi"])
     query(kpi, {"Data": [projection(CPK, "Measure", "Cpk Pass %", "Cpk pass %")]})
+    # 110 px high (the hero of page 1 is 130): smaller figure, so that it is not cut at the bottom
+    kpi["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(22)
     kpi["visual"]["visualContainerObjects"] = R.vco_card("Cpk pass %", "Characteristics with Cpk ≥ threshold",
                                                          pad=(12, 2, 16, 16), header=False)
     # Cpk Pass & Fail donut
@@ -148,6 +155,7 @@ def build_cpk_page(src, idx, p1, page_ids):
         for e in bars["visual"]["objects"]["dataPoint"]:
             m = e["selector"]["metadata"]
             e["selector"]["metadata"] = f"{CPK}.Cpk Fail Bar" if m.endswith("Fail Bar") else f"{CPK}.Cpk Pass Bar"
+        bars["visual"]["objects"]["valueAxis"] = [P(show=B(False), showAxisTitle=B(False), gridlineShow=B(False))]
         bars["visual"]["visualContainerObjects"] = R.vco_card(
             f"{role} – Cpk Pass & Fail %", "Share of characteristics · total = characteristics with a Cpk")
     # Characteristics – Cpk detail
@@ -170,9 +178,12 @@ def build_cpk_page(src, idx, p1, page_ids):
             "positiveColor": C("#9DC3E6"), "negativeColor": C("#9DC3E6"), "axisColor": C(R.WHITE),
             "reverseDirection": B(False), "hideText": B(False)}}, {"metadata": f"{CPK}.Cpk Measured Values"})]
     o["columnWidth"] = [SEL({"value": N(w)}, {"metadata": f"{CPK}.{n}"}) for _, n, _, w in cols]
+    # One row per characteristic would mean tens of thousands of Cpk to compute and sort before the first row
+    # shows: the table lists the 100 lowest Cpk of the current filters (a part or a test narrows it down).
     table["visual"]["visualContainerObjects"] = R.vco_card(
-        "Characteristics – Cpk detail", "Lowest Cpk first · status against the threshold chosen in More filters")
-    table["filterConfig"] = {"filters": [measure_equals(CPK, "Cpk Status Visible", "1L")]}
+        "Characteristics – Cpk detail",
+        f"The {cm.DETAIL_ROWS} lowest Cpk of the current filters · select a part or a test to see its characteristics")
+    table["filterConfig"] = {"filters": [top_n(CPK, "Group", "Cpk Detail Rank", cm.DETAIL_ROWS)]}
 
     # More filters: inspection reason, Cpk threshold, Cpk pass / fail
     for role in ("overlay_look", "overlay_btn", "panel_bg", "x_look", "x_btn"):
