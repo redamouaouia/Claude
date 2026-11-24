@@ -240,9 +240,14 @@ def build_home_page(src, idx, page_ids):
             "value": [SEL({"show": B(True), "fontSize": N(11.5), "fontFamily": S("Segoe UI Semibold"),
                            "fontColor": C(R.WHITE), "horizontalAlignment": S("right")}, off)],
             "label": [SEL({"show": B(False)}, off)],
-            **{o: [SEL({"show": B(False)}, off)] for o in ("fillCustom", "outline", "border", "accentBar",
-                                                            "shadowCustom", "glowCustom")},
-            "cardCalloutArea": [SEL({"show": B(False), "paddingIndividual": B(False), "paddingUniform": R.I(0)}, off)],
+            **{o: [SEL({"show": B(False)}, off)] for o in ("outline", "border", "accentBar", "shadowCustom",
+                                                            "glowCustom")},
+            # The base theme fills each card in white: "show: false" alone left a white box on the blue hero, so
+            # every fill is made fully transparent.
+            "fillCustom": [SEL({"show": B(True), "fillColor": C(R.WHITE), "transparency": N(100)}, off)],
+            "layout": [SEL({"backgroundShow": B(False), "backgroundTransparency": N(100)}, off)],
+            "cardCalloutArea": [SEL({"show": B(False), "backgroundTransparency": N(100), "paddingIndividual": B(False),
+                                     "paddingUniform": R.I(0)}, off)],
             "padding": [SEL({"paddingSelection": S("Custom"), "paddingIndividual": B(True), "leftMargin": R.I(0),
                              "rightMargin": R.I(0), "topMargin": R.I(0), "bottomMargin": R.I(0)}, off)],
         }
