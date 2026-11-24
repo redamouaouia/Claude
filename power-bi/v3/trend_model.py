@@ -29,13 +29,13 @@ TREND_MEASURES = [  # (name, expression, format, folder, description, dynamic fo
      "Mean of the measured values (X bar).", None),
     # The value axis covers the values and every limit line (Power BI does not widen it for constant lines).
     ("Trend Axis Min",
-     f"VAR lo = MINX({{CALCULATE(MIN({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend LSL], [Trend LCL]}}, [Value])\n"
-     f"VAR hi = MAXX({{CALCULATE(MAX({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend USL], [Trend UCL]}}, [Value])\n"
-     f"RETURN\n\tIF({GROUPS} = 1, lo - IF(hi > lo, (hi - lo) * 0.08, 1))", "0.####", "Trend\\Axis", None, None),
+     f"VAR _lo = MINX({{CALCULATE(MIN({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend LSL], [Trend LCL]}}, [Value])\n"
+     f"VAR _hi = MAXX({{CALCULATE(MAX({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend USL], [Trend UCL]}}, [Value])\n"
+     f"RETURN\n\tIF({GROUPS} = 1, _lo - IF(_hi > _lo, (_hi - _lo) * 0.08, 1))", "0.####", "Trend\\Axis", None, None),
     ("Trend Axis Max",
-     f"VAR lo = MINX({{CALCULATE(MIN({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend LSL], [Trend LCL]}}, [Value])\n"
-     f"VAR hi = MAXX({{CALCULATE(MAX({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend USL], [Trend UCL]}}, [Value])\n"
-     f"RETURN\n\tIF({GROUPS} = 1, hi + IF(hi > lo, (hi - lo) * 0.08, 1))", "0.####", "Trend\\Axis", None, None),
+     f"VAR _lo = MINX({{CALCULATE(MIN({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend LSL], [Trend LCL]}}, [Value])\n"
+     f"VAR _hi = MAXX({{CALCULATE(MAX({Q}[Measured Value]), REMOVEFILTERS({AT})), [Trend USL], [Trend UCL]}}, [Value])\n"
+     f"RETURN\n\tIF({GROUPS} = 1, _hi + IF(_hi > _lo, (_hi - _lo) * 0.08, 1))", "0.####", "Trend\\Axis", None, None),
     ("Trend Subtitle",
      f"VAR g = {GROUPS}\n"
      f"VAR c = CALCULATE(SELECTEDVALUE({Q}[Characteristic]), REMOVEFILTERS({AT}), KEEPFILTERS(NOT ISBLANK({Q}[Cpk Group])))\n"
@@ -53,7 +53,7 @@ TREND_MEASURES = [  # (name, expression, format, folder, description, dynamic fo
      '"Trend chart – select one part, one test and one characteristic")',
      None, "Trend", "Title of the trend chart: says what to select while the chart is empty.", None),
     ("Trend Cpk Goal",
-     'VAR goal = "Goal " & FORMAT([Cpk Threshold], "0.00")\nRETURN\n'
-     f'\tIF({GROUPS} = 1, goal & " · " & [Cpk Status Label], goal & " · select one characteristic")',
+     'VAR _goal = "Goal " & FORMAT([Cpk Threshold], "0.00")\nRETURN\n'
+     f'\tIF({GROUPS} = 1, _goal & " · " & [Cpk Status Label], _goal & " · select one characteristic")',
      None, "Trend", "Subtitle of the Cpk card: threshold (More filters, 1.33 if none) and Pass / Fail.", None),
 ]
