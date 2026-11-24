@@ -225,36 +225,19 @@ def build_home_page(src, idx, page_ids):
     x, y, w, h = D.HOME_REFRESH
     A.place(refresh, x + 24, y, w - 28, h)
     out.append(refresh)
-    # Live figures, right-aligned as the fixed ones of the background ("12 months", "Daily"): new card visual (the
-    # plain card centres its text), no padding, placed on the text line of the 32 px row.
-    like = next(v for v in src.values() if v["visual"]["visualType"] == "cardVisual")
+    # Live figures (plants, measured values): plain card, as the refresh time. It centres its text: the fixed figures
+    # of the background ("12 months", "Daily") are centred in the same column. (The new card visual, tried for a
+    # right alignment, showed nothing at this size on the blue hero.)
     vx, vw, vh = D.HOME_FACT_VALUE
-    off = R.DEFAULT
     for key, measure in D.HOME_FACTS:
         if not measure:
             continue
-        card = A.clone(like)
-        A.place(card, vx, D.HOME_FACT_Y[key] + 6, vw, vh - 8)
-        query(card, {"Data": [projection(bt.T, "Measure", measure, measure)]})
+        card = A.clone(src[idx["refresh"]])
+        A.place(card, vx, D.HOME_FACT_Y[key], vw, vh)
+        query(card, {"Values": [projection(bt.T, "Measure", measure, measure)]})
         card["visual"]["objects"] = {
-            "value": [SEL({"show": B(True), "fontSize": N(11.5), "fontFamily": S("Segoe UI Semibold"),
-                           "fontColor": C(R.WHITE), "horizontalAlignment": S("right")}, off)],
-            "label": [SEL({"show": B(False)}, off)],
-            **{o: [SEL({"show": B(False)}, off)] for o in ("outline", "border", "accentBar", "shadowCustom",
-                                                            "glowCustom")},
-            # The base theme fills each card in white: "show: false" alone left a white box on the blue hero, so
-            # every fill is made fully transparent.
-            "fillCustom": [SEL({"show": B(True), "fillColor": C(R.WHITE), "transparency": N(100)}, off)],
-            "layout": [SEL({"backgroundShow": B(False), "backgroundTransparency": N(100)}, off)],
-            "cardCalloutArea": [SEL({"show": B(False), "backgroundTransparency": N(100), "paddingIndividual": B(False),
-                                     "paddingUniform": R.I(0)}, off)],
-            "padding": [SEL({"paddingSelection": S("Custom"), "paddingIndividual": B(True), "paddingUniform": R.I(0),
-                             "leftMargin": R.I(0), "rightMargin": R.I(0), "topMargin": R.I(0),
-                             "bottomMargin": R.I(0)}, off)],
-        }
-        # The base theme shows a subtitle on this card type: it took the 24 px and hid the figure.
-        card["visual"]["visualContainerObjects"] = R.vco_plain({"subTitle": [P(show=B(False))]})
-        card.pop("filterConfig", None)
+            "labels": [P(color=C(R.WHITE), fontSize=N(11.5), fontFamily=S("Segoe UI Semibold"))],
+            "categoryLabels": [P(show=B(False))]}
         out.append(card)
     return out
 

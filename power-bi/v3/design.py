@@ -149,7 +149,7 @@ HOME_ROWS = {key: (648, 96 + i * 90, 608, 80) for i, (_, key) in enumerate(NAV)}
 HOME_GUIDE = (648, 548, 608, 156)
 HOME_FACTS = [("plants", "Plants"), ("months", None), ("values", "Home Measured Values"), ("daily", None)]
 HOME_FACT_Y = {key: 470 + i * 40 for i, (key, _) in enumerate(HOME_FACTS)}  # one line per fact
-HOME_FACT_VALUE = (HOME_PAD + 2, 130, 32)  # x, width, height of a live value (Power BI card): right-aligned
+HOME_FACT_VALUE = (HOME_PAD + 2, 130, 32)  # x, width, height of a live value (Power BI card, text centred)
 HOME_REFRESH = (HOME_PAD + 2, 664, 300, 26)
 CONTEXT = (X0, SLICER_Y, 820, SLICER_H)          # details page: the part chosen with "Details"
 BACK = (X1 - MORE_W, SLICER_Y, MORE_W, SLICER_H)  # details page: back to Reaction limits
@@ -376,7 +376,7 @@ HOME_CSS = f"""
                 color: rgba(255,255,255,.75); }}
   .fact {{ position: absolute; left: {HOME_PAD + 2}px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
           color: rgba(255,255,255,.82); }}
-  .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; text-align: right; }}
+  .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; text-align: center; }}
   .fact span {{ position: absolute; left: 140px; white-space: nowrap; }}
   .hpill {{ position: absolute; left: {HOME_REFRESH[0] - HOME_HERO[0]}px; top: {HOME_REFRESH[1]}px; width: {HOME_REFRESH[2]}px;
            height: {HOME_REFRESH[3]}px; border-radius: 13px; background: rgba(255,255,255,.10);
