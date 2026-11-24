@@ -75,6 +75,7 @@ SQL_LINES = [
     "    count(*) OVER grp AS cpk_count, sum(characteristic_value_num) OVER grp AS cpk_sum,",
     "    count(moving_range) OVER grp AS cpk_range_count, sum(moving_range) OVER grp AS cpk_range_sum,",
     "    last_value(usl_inspection_plan) OVER lim AS cpk_usl, last_value(lsl_inspection_plan) OVER lim AS cpk_lsl,",
+    "    last_value(limit_max_alert) OVER lim AS cpk_ucl, last_value(limit_min_alert) OVER lim AS cpk_lcl,",
     f"    row_number() OVER (PARTITION BY {CPK_KEY}, reason, posting_date, in_cpk",
     "      ORDER BY date_time DESC, key_order_inspection_plan_index_plant DESC) AS cpk_row",
     "  FROM ranges",
@@ -110,7 +111,11 @@ SQL_LINES = [
       for (src, name), sep in zip([("xxhash64(plant, part_name, process, characteristic)", "Cpk Group"),
                                    ("cpk_count", "Cpk Value Count"), ("cpk_sum", "Cpk Value Sum"),
                                    ("cpk_range_count", "Cpk Range Count"), ("cpk_range_sum", "Cpk Range Sum"),
-                                   ("cpk_usl", "Cpk USL"), ("cpk_lsl", "Cpk LSL")], [","] * 7)],
+                                   ("cpk_usl", "Cpk USL"), ("cpk_lsl", "Cpk LSL"), ("cpk_ucl", "Cpk UCL"),
+                                   ("cpk_lcl", "Cpk LCL")], [","] * 9)],
+    # Each value that enters the Cpk, with its time (local time of the plant): the trend chart (page 5).
+    "  CASE WHEN in_cpk THEN characteristic_value_num END AS `Measured Value`,",
+    "  CASE WHEN in_cpk THEN date_time END AS `Measured At`,",
     # Key of the period filter (table Period): the date as yyyymmdd x 10, + 1 for the last 24 hours of the plant.
     "  (year(posting_date) * 10000 + month(posting_date) * 100 + day(posting_date)) * 10",
     "    + CASE WHEN date_time > latest_time - INTERVAL 24 HOURS AND date_time <= latest_time THEN 1 ELSE 0 END"
@@ -155,6 +160,10 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("Cpk Range Sum", "double", "type number", True, None),
     ("Cpk USL", "double", "type number", True, "0.####"),
     ("Cpk LSL", "double", "type number", True, "0.####"),
+    ("Cpk UCL", "double", "type number", True, "0.####"),
+    ("Cpk LCL", "double", "type number", True, "0.####"),
+    ("Measured Value", "double", "type number", False, "0.####"),
+    ("Measured At", "dateTime", "type datetime", False, "dd/MM/yy HH:mm"),
     ("Refreshed At", "dateTime", "type datetime", True, "General Date"),
     ("Period Key", "int64", "Int64.Type", True, "0"),
 ]
@@ -175,6 +184,11 @@ COLUMN_INFO = {  # name: (display folder, description)
     "Cpk Range Sum": ("Cpk sums", "Sum of the moving ranges, for sigma. " + CPK_SUMS),
     "Cpk USL": ("Cpk sums", "Upper specification limit of the last measurement of the group. " + CPK_SUMS),
     "Cpk LSL": ("Cpk sums", "Lower specification limit of the last measurement of the group. " + CPK_SUMS),
+    "Cpk UCL": ("Cpk sums", "Upper reaction (control) limit of the last measurement of the group. " + CPK_SUMS),
+    "Cpk LCL": ("Cpk sums", "Lower reaction (control) limit of the last measurement of the group. " + CPK_SUMS),
+    "Measured Value": ("Trend", "Measured value of a variable characteristic, as it enters the Cpk (Pass or Fail, "
+                                "below 100 000, at least one limit); empty on the other rows."),
+    "Measured At": ("Trend", "Time of that measured value, local time of the plant; empty on the other rows."),
     "Refreshed At": (None, "Time (UTC) of the refresh that loaded the row; the latest one is the last refresh."),
     "Period Key": (None, "Link to the period filter (table Period): date as yyyymmdd x 10, + 1 when the value is in "
                          "the last 24 hours of its plant (counted back from the latest measurement of the plant)."),

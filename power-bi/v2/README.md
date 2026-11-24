@@ -47,7 +47,8 @@ La jauge « 12 derniers mois » ne montre donc que cette période tant que le ra
   - les sommes du Cpk (dossier *Cpk sums*), sur une ligne par caractéristique, motif d'inspection et jour (page Cpk
     de la V3) ;
   - `Period Key`, le lien avec le filtre de période de la V10 : la date, et si la valeur est dans les 24 dernières
-    heures de son usine.
+    heures de son usine ;
+  - `Measured Value` et `Measured At`, chaque valeur qui entre dans le Cpk et son heure (page Trend chart de la V11).
 
   Power Query ajoute `Refreshed At`, l'heure de l'actualisation en UTC. La mesure `Last Refresh` en affiche la plus
   récente.

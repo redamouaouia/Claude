@@ -31,8 +31,9 @@ bt = pm.bt
 T = bt.T
 OUT_NAME = "Quality_Dashboard_V10"
 TITLES = {"Home": "home", "Overview": "overview", "Characteristics": "chars", "Reaction limits": "rl", "Cpk": "cpk",
-          "Reaction limit details": "rl_details"}
-BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk")
+          "Reaction limit details": "rl_details", "Trend chart": "trend"}
+OPTIONAL = {"trend"}  # pages added after V10
+BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk", trend="TrendChart")
 # States of the button slicer (ids of its formatting selectors, as in the Power BI base theme)
 HOVER, PRESS, SELECTED = {"id": "interaction:hover"}, {"id": "interaction:press"}, {"id": "selection:selected"}
 ACCENT = "#6FA8E8"  # light blue of the active page marker
@@ -113,7 +114,7 @@ def add_period_slicers(defs, keys):
         if k.startswith("bookmarks/") and k.endswith(".bookmark.json"):
             panels.setdefault(b["explorationState"].get("activeSection"), set()).update(
                 b.get("options", {}).get("targetVisualNames", []))
-    for key in D.PERIOD_PAGES:
+    for key in [k for k in D.PERIOD_PAGES if k in keys]:
         pid = keys[key]
         vis = {v["name"]: v for k, v in defs.items() if k.startswith(f"pages/{pid}/visuals/")}
         refresh = next(v for v in vis.values() if v["visual"]["visualType"] == "card"
@@ -156,8 +157,8 @@ def main():
         if title not in TITLES:
             sys.exit(f"unexpected page '{title}'")
         keys[TITLES[title]] = pid
-    if set(keys) != set(TITLES.values()):
-        sys.exit(f"pages missing: {sorted(set(TITLES.values()) - set(keys))}")
+    if set(TITLES.values()) - OPTIONAL - set(keys):
+        sys.exit(f"pages missing: {sorted(set(TITLES.values()) - OPTIONAL - set(keys))}")
 
     removed = update_overview(defs, keys["overview"])
     add_period_slicers(defs, keys)

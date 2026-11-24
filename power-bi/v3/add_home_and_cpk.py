@@ -36,9 +36,10 @@ T = bt.T
 OUT_NAME = "Quality_Dashboard_V9"
 HOME_TITLE = "Home"
 TITLES = {"Overview": "overview", "Characteristics": "chars", "Reaction limits": "rl",
-          "Reaction limit details": "rl_details"}
+          "Reaction limit details": "rl_details", "Trend chart": "trend"}
 NEW_TITLES = {HOME_TITLE, D.PAGES["cpk"]["title"]}
-BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk")
+BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk", trend="TrendChart")
+ORDER = ("home", "overview", "chars", "rl", "cpk", "trend", "rl_details")  # page order (trend: from V11)
 
 
 # --------------------------------------------------------------------------- fields of any table
@@ -110,7 +111,8 @@ def build_cpk_page(src, idx, p1, donut_like, page_ids):
         return v
 
     for label, key in D.NAV:
-        add(nav_button(src[idx["nav:overview"]], key, page_ids[key], label))
+        if key in page_ids:
+            add(nav_button(src[idx["nav:overview"]], key, page_ids[key], label))
     add(nav_button(src[idx["nav:overview"]], "home", page_ids["home"], "Home"))
     add(A.clone(src[idx["clear"]]))
     add(A.clone(src[idx["refresh"]]))
@@ -212,10 +214,11 @@ def build_cpk_page(src, idx, p1, donut_like, page_ids):
 # --------------------------------------------------------------------------- home page
 def build_home_page(src, idx, page_ids):
     out = []
-    for label, key in D.NAV:
+    nav = [(label, key) for label, key in D.NAV if key in page_ids]
+    for label, key in nav:
         out.append(nav_button(src[idx["nav:overview"]], key, page_ids[key], label))
     out.append(A.clone(src[idx["clear"]]))
-    for label, key in D.NAV:
+    for label, key in nav:
         row = A.clone(src[idx["x_btn"]], hidden=False)
         A.place(row, *D.HOME_ROWS[key])
         A.set_link(row, type="PageNavigation", navigationSection=page_ids[key], tooltip=f"Open {label}")
@@ -297,7 +300,7 @@ def main():
         sys.exit(f"page Characteristics: could not find {missing}")
 
     # Cpk tile and Home button on the existing pages
-    for key in ("overview", "chars", "rl", "rl_details"):
+    for key in [k for k in ("overview", "chars", "rl", "rl_details", "trend") if k in page_ids]:
         pid = page_ids[key]
         own = visuals_of(pid)
         like = own[A.index_page(own, page_keys)["nav:chars"]]
@@ -351,11 +354,11 @@ def main():
         for i, v in enumerate(vlist):
             v["position"]["z"] = v["position"]["tabOrder"] = i * 1000
             defs[f"pages/{pid}/visuals/{v['name']}/visual.json"] = v
-    meta["pageOrder"] = [page_ids[k] for k in ("home", "overview", "chars", "rl", "cpk", "rl_details")]
+    meta["pageOrder"] = [page_ids[k] for k in ORDER if k in page_ids]
     meta["activePageName"] = page_ids["home"]
 
     images = {}
-    for key in ("home", "overview", "chars", "rl", "cpk", "rl_details"):
+    for key in [k for k in ORDER if k in page_ids]:
         item = f"QualityDashboard{BG_NAMES[key]}{secrets.token_hex(6)}.png"
         images[item] = (HERE / "out" / f"bg_{key}.png").read_bytes()
         A.set_background(defs[f"pages/{page_ids[key]}/page.json"], D.PAGES[key]["title"], item)

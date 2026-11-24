@@ -21,13 +21,14 @@ ROW2_Y, ROW2_H = 156, 254
 ROW3_Y, ROW3_H = 424, 280
 GAP = 16
 
-NAV = [("Overview", "overview"), ("Characteristics", "chars"), ("Reaction limits", "rl"), ("Cpk", "cpk")]
+NAV = [("Overview", "overview"), ("Characteristics", "chars"), ("Reaction limits", "rl"), ("Cpk", "cpk"),
+       ("Trend chart", "trend")]
 NAV_TILES = {k: (10, 96 + i * 74, 76, 64) for i, (_, k) in enumerate(NAV)}
 BADGE = (20, 16, 56, 56)  # company symbol at the top of the rail: the Home button of every page
 CLEAR_TILE = (10, 636, 76, 64)
 REFRESH_PILL = (966, 22, 290, 26)
 PERIOD_TRACK = (966, 54, 290, 26)  # period filter (Day, WTD, MTD, YTD, Year), under the refresh time
-PERIOD_PAGES = ("overview", "chars", "rl", "cpk")
+PERIOD_PAGES = ("overview", "chars", "rl", "cpk", "trend")
 DATE_W, MORE_W = 250, 132  # fixed widths: two date boxes, and the full "More filters · N" label
 
 
@@ -100,9 +101,9 @@ PAGES = {
     },
 }
 PAGES["cpk"] = {
-    # Page 4, laid out as the mockup of the specification. Its rules are still to be validated.
+    # Page 4, laid out as the mockup of the specification. The Pass & Fail donut was removed at the client's request:
+    # Cpk pass % fills its card.
     "title": "Cpk",
-    "status": "To be validated",
     "question": "Which parts, tests and characteristics are capable?",
     "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
                 ("Characteristic", "Characteristic", 1.25), ("Date", "Date", 1.45)],
@@ -117,7 +118,22 @@ PAGES["cpk"] = {
     },
 }
 FORMER_DONUT = (956, ROW2_Y, 300, ROW2_H)  # Overview donut until V9 (restyle.py), removed by add_period_filter.py
+TREND_KPI_H = 120  # height of the two cards above the trend chart (a figure of 24 pt and two lines of text)
 CPK_FIGURE_H = 128  # height of the Cpk pass % figure in its card (as the hero of page 1: below, it gets cut)
+PAGES["trend"] = {
+    # Page 5, laid out as the mockup of the specification: one characteristic at a time (Part, Test and
+    # Characteristic are mandatory), its reaction limit violations and Cpk, its measured values against the limits.
+    "title": "Trend chart",
+    "question": "How do the measured values and Cpk evolve over time?",
+    "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan *", 1.2), ("Test", "Test *", 1.1),
+                ("Characteristic", "Characteristic *", 1.25), ("Date", "Date", 1.45)],
+    "more_count": 2,
+    "cards": {
+        "violations": (X0, ROW2_Y, 558, TREND_KPI_H),
+        "cpk": (X0 + 558 + GAP, ROW2_Y, X1 - X0 - 558 - GAP, TREND_KPI_H),
+        "chart": (X0, ROW2_Y + TREND_KPI_H + GAP, X1 - X0, H - 16 - (ROW2_Y + TREND_KPI_H + GAP)),
+    },
+}
 PAGES["home"] = {
     # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
     "title": "Quality Dashboard",
@@ -127,7 +143,7 @@ PAGES["home"] = {
     "cards": {},
 }
 HOME_HERO = (RAIL_W, 0, 520, H)
-HOME_ROWS = {key: (648, 96 + i * 112, 608, 100) for i, (_, key) in enumerate(NAV)}  # one row per page
+HOME_ROWS = {key: (648, 96 + i * 90, 608, 80) for i, (_, key) in enumerate(NAV)}  # one row per page
 HOME_GUIDE = (648, 548, 608, 156)
 HOME_FACTS = [("plants", "Plants"), ("months", None), ("values", "Home Measured Values"), ("daily", None)]
 HOME_FACT_Y = {key: 470 + i * 40 for i, (key, _) in enumerate(HOME_FACTS)}  # one line per fact
@@ -166,6 +182,8 @@ ICONS = {
     "glyph": '<path d="M3 6.5h18M3 17.5h18" stroke-dasharray="2.2 2.2"/>'
              '<path d="M3 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0 2.4 2.6 3.6 1.4"/>',
     "clock": '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+    "trend": '<path d="M2.5 5.5h19M2.5 18.5h19" stroke-dasharray="2.2 2.2"/>'
+             '<path d="M3 13.5l3.2-3.5 3 3.2 3.4-5.2 3.2 6 3-3.4 2.7 1.4"/>',
 }
 
 
@@ -385,11 +403,13 @@ HOME_PAGES = {  # page key: (question, highlights)
     "overview": ("How many inspections pass, and where do they fail?",
                  "Pass % vs the 95 % target · Pass & Fail by part and by test · where inspections fail"),
     "chars": ("How do measured values evolve, and which characteristics fail?",
-              "Measured values per day · Pass & Fail % by part and by test · results per characteristic"),
+              "Values per day · Pass & Fail % by part and by test · results per characteristic"),
     "rl": ("Where are measurements getting close to the limit?",
            "Violations per day · top 15 characteristics · details: value, limits, tolerance"),
     "cpk": ("Which parts, tests and characteristics are capable?",
             "Cpk pass % · Cpk by part and by test · Cpk of each characteristic"),
+    "trend": ("How do the measured values and Cpk evolve over time?",
+              "One characteristic · measured values vs USL, UCL, X̄, LCL, LSL · Cpk vs goal"),
 }
 
 
@@ -422,6 +442,11 @@ def mini_preview(key, w, h):
         s += (f'<rect x="{x0:.0f}" y="10" width="{tw * .55:.0f}" height="{th:.0f}" rx="3" fill="{rl}"/>'
               f'<rect x="{x0 + tw * .58:.0f}" y="10" width="{tw * .42:.0f}" height="{th * .55:.0f}" rx="3" fill="#3E6C9E"/>'
               f'<rect x="{x0 + tw * .58:.0f}" y="{10 + th * .58:.0f}" width="{tw * .42:.0f}" height="{th * .42:.0f}" rx="3" fill="#7C9CC6"/>')
+    elif key == "trend":
+        for y, color, dash in ((9, "#C00000", ""), (17, orange, ' stroke-dasharray="3 3"'),
+                               (h - 17, orange, ' stroke-dasharray="3 3"'), (h - 9, "#C00000", "")):
+            s += f'<path d="M10 {y}H{w - 10}" stroke="{color}" stroke-opacity=".75"{dash}/>'
+        s += line([.55, .7, .4, .62, .5, .78, .35, .6, .52, .66, .45, .58], 12, 14, w - 24, h - 28, blue, area=False)
     else:
         cx, base = w * .5, h - 12
         s += (f'<path d="M10 {base} C{cx - 30} {base} {cx - 22} 12 {cx} 12 S{cx + 30} {base} {w - 10} {base}" fill="{blue}" '
@@ -445,7 +470,7 @@ def home_body():
         question, highlights = HOME_PAGES[key]
         tbv = '<span class="tbv">To be validated</span>' if PAGES[key].get("status") else ""
         rows += (f'<div class="plate row" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
-                 f'{mini_preview(key, 150, 76)}<div style="flex:1"><div class="idx">0{i + 1}</div>'
+                 f'{mini_preview(key, 150, h - 18)}<div style="flex:1"><div class="idx">0{i + 1}</div>'
                  f'<div class="name">{html.escape(label)}{tbv}</div><div class="qq">{html.escape(question)}</div>'
                  f'<div class="hl">{html.escape(highlights)}</div></div><div class="go">›</div></div>')
     gx, gy, gw, gh = HOME_GUIDE

@@ -130,6 +130,37 @@ Comment c'est construit (`period_model.py`) :
 - Les 7 derniers jours sont actualisés à chaque fois (actualisation incrémentielle). Le repère des 24 heures est donc
   toujours à jour.
 
+## V11 : page 5 « Trend chart », page Cpk sans donut
+
+`add_trend_page.py` part de la V10 et produit `out/Quality_Dashboard_V11.pbit`. Le modèle change, donc les données
+se rechargent à l'ouverture.
+
+**Trend chart**, d'après la page 5 de la spécification :
+- **Une caractéristique à la fois.** Part, Test et Characteristic sont marqués * dans le bandeau. Tant que les filtres
+  laissent plusieurs couples usine + pièce + test + caractéristique, la courbe reste vide et son sous-titre dit quoi
+  choisir.
+- **Reaction limit violations** : les valeurs hors limites de réaction pour les filtres en cours.
+- **Cpk** comparé à l'objectif, c'est-à-dire le seuil choisi dans More filters (1,33 par défaut). Le sous-titre
+  indique *Goal 1.33 · ✔ Pass* ou *✖ Fail*.
+- **La courbe** : chaque valeur mesurée, dans l'ordre du temps (heure locale de l'usine), avec les lignes USL, UCL,
+  X̄, LCL et LSL. Leur nom et leur valeur sont affichés à droite. L'axe vertical couvre toujours les valeurs et
+  toutes les limites.
+- **Filtres** : les mêmes que sur les autres pages (mêmes groupes de synchronisation, filtre de période compris).
+  More filters : Inspection reason et Cpk threshold.
+
+Pour cette page, `Quality Tracker` gagne 4 colonnes :
+- `Measured Value` et `Measured At`, la valeur et son heure, sur les lignes qui entrent dans le Cpk ;
+- `Cpk UCL` et `Cpk LCL`, les limites de réaction de la dernière mesure, sur les lignes qui portent les sommes du
+  Cpk.
+
+L'USL, la LSL et X̄ viennent des colonnes déjà utilisées pour le Cpk.
+
+**Autres changements :**
+- Une 5e tuile *Trend chart* apparaît sur toutes les pages, et une 5e ligne sur la page d'accueil.
+- Page Cpk : le donut Pass & Fail est supprimé. *Cpk pass %* occupe sa carte, avec *n of N characteristics* en
+  dessous, et la mention *To be validated* disparaît.
+- Le filtre de période revient sur *Year* sur toutes les pages.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -148,7 +179,7 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
    python -c "import design; [open(f'out/bg_{p}.html','w').write(design.page_html(p)) for p in design.PAGES]"
    ```
    ```bash
-   node tools/render_backgrounds.js out/bg_home.html out/bg_home.png out/bg_overview.html out/bg_overview.png out/bg_chars.html out/bg_chars.png out/bg_rl.html out/bg_rl.png out/bg_cpk.html out/bg_cpk.png out/bg_rl_details.html out/bg_rl_details.png
+   node tools/render_backgrounds.js out/bg_home.html out/bg_home.png out/bg_overview.html out/bg_overview.png out/bg_chars.html out/bg_chars.png out/bg_rl.html out/bg_rl.png out/bg_cpk.html out/bg_cpk.png out/bg_rl_details.html out/bg_rl_details.png out/bg_trend.html out/bg_trend.png
    ```
 2. Appliquer le design au `.pbix` V2 enregistré par Power BI Desktop (format PBIR) :
    ```bash
@@ -166,7 +197,11 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_period_filter.py <V9.pbix> --range 2026-01-01 2026-02-01
    ```
-6. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
+6. Ajouter la page 5 « Trend chart » au `.pbix` V10, après l'étape 1 :
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_trend_page.py <V10.pbix> --range 2026-01-01 2026-02-01
+   ```
+7. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_backgrounds.py <V4.pbix>
    ```
@@ -190,8 +225,8 @@ Databricks, et chaque règle de la version SQL devient une étape Power Query.
 Différences de modèle :
 - `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que la version SQL le réduit à un
   entier avec `xxhash64` ;
-- le rapport V3 n'a ni page Cpk ni filtre de période, donc les colonnes *Cpk sums* et `Period Key` ne sont pas
-  calculées.
+- le rapport V3 n'a ni pages Cpk et Trend chart ni filtre de période, donc les colonnes faites pour elles
+  (*Cpk sums*, `Measured Value`, `Measured At`, `Period Key`) ne sont pas calculées.
 
 Les noms des autres colonnes ne changent pas : le rapport n'est pas modifié.
 

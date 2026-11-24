@@ -13,6 +13,7 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import cpk_model as cm  # noqa: E402
+import trend_model as tm  # noqa: E402
 
 bt = cm.bt
 PERIOD = "Period"
@@ -66,6 +67,7 @@ PERIOD_MEASURES = [
 
 def write_model(work, settings):
     """The whole model of the report: Quality Tracker with all its measures, the two Cpk lists and Period."""
-    return bt.write_model(work, settings, extra_measures=cm.CPK_MEASURES + cm.HOME_MEASURES + PERIOD_MEASURES,
+    measures = cm.CPK_MEASURES + cm.HOME_MEASURES + PERIOD_MEASURES + tm.TREND_MEASURES
+    return bt.write_model(work, settings, extra_measures=measures,
                           extra_tables=cm.extra_tables() + [PERIOD_TABLE], policy=cm.QT_POLICY,
                           relationships=RELATIONSHIPS)
