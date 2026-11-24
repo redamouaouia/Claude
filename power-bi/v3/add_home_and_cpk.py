@@ -248,10 +248,12 @@ def build_home_page(src, idx, page_ids):
             "layout": [SEL({"backgroundShow": B(False), "backgroundTransparency": N(100)}, off)],
             "cardCalloutArea": [SEL({"show": B(False), "backgroundTransparency": N(100), "paddingIndividual": B(False),
                                      "paddingUniform": R.I(0)}, off)],
-            "padding": [SEL({"paddingSelection": S("Custom"), "paddingIndividual": B(True), "leftMargin": R.I(0),
-                             "rightMargin": R.I(0), "topMargin": R.I(0), "bottomMargin": R.I(0)}, off)],
+            "padding": [SEL({"paddingSelection": S("Custom"), "paddingIndividual": B(True), "paddingUniform": R.I(0),
+                             "leftMargin": R.I(0), "rightMargin": R.I(0), "topMargin": R.I(0),
+                             "bottomMargin": R.I(0)}, off)],
         }
-        card["visual"]["visualContainerObjects"] = R.vco_plain()
+        # The base theme shows a subtitle on this card type: it took the 24 px and hid the figure.
+        card["visual"]["visualContainerObjects"] = R.vco_plain({"subTitle": [P(show=B(False))]})
         card.pop("filterConfig", None)
         out.append(card)
     return out
