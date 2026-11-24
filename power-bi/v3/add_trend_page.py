@@ -66,22 +66,14 @@ def strip_trend_page(defs, meta):
 
 
 # --------------------------------------------------------------------------- Cpk page
-def update_cpk_page(defs, pid, card_like):
-    """Donut removed; Cpk pass % fills its card, with "n of N characteristics" below the figure."""
+def update_cpk_page(defs, pid):
+    """Donut removed; Cpk pass % fills its card (the "n of N characteristics" line below it was taken out in V12)."""
     vis = {k: v for k, v in defs.items() if k.startswith(f"pages/{pid}/visuals/")}
     for k in [k for k, v in vis.items() if v["visual"]["visualType"] == "donutChart"]:
         del defs[k]
     kpi = next(v for v in vis.values() if v["visual"]["visualType"] == "cardVisual")
-    kx, ky, kw, kh = D.PAGES["cpk"]["cards"]["kpi"]
-    A.place(kpi, kx, ky, kw, kh)
+    A.place(kpi, *D.PAGES["cpk"]["cards"]["kpi"])
     kpi["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(40)
-    old = [k for k, v in vis.items() if v["visual"]["visualType"] == "card" and k in defs
-           and "Cpk Pass Of Total" in json.dumps(v)]
-    for k in old:  # from an earlier run
-        del defs[k]
-    total = text_line(card_like, (kx + 16, ky + 112, kw - 32, 26), "Cpk Pass Of Total", "Characteristics")
-    total["position"]["z"] = total["position"]["tabOrder"] = kpi["position"]["z"] + 1
-    defs[f"pages/{pid}/visuals/{total['name']}/visual.json"] = total
 
 
 def text_line(card_like, rect, measure_name, display):
@@ -262,7 +254,7 @@ def main():
     card_like = next(v for v in p1.values() if v["visual"]["visualType"] == "card")  # plain card (refresh time)
 
     # Cpk page
-    update_cpk_page(defs, keys["cpk"], card_like)
+    update_cpk_page(defs, keys["cpk"])
 
     # Trend chart page
     visuals, panel_map, more_btn = build_trend_page(src, idx, p1, card_like, keys)

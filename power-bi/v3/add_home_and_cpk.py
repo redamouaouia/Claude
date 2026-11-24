@@ -213,11 +213,9 @@ def build_cpk_page(src, idx, p1, donut_like, page_ids):
 
 # --------------------------------------------------------------------------- home page
 def build_home_page(src, idx, page_ids):
+    # No navigation rail on the home page (V12): its rows open the pages; no filter to clear either.
     out = []
     nav = [(label, key) for label, key in D.NAV if key in page_ids]
-    for label, key in nav:
-        out.append(nav_button(src[idx["nav:overview"]], key, page_ids[key], label))
-    out.append(A.clone(src[idx["clear"]]))
     for label, key in nav:
         row = A.clone(src[idx["x_btn"]], hidden=False)
         A.place(row, *D.HOME_ROWS[key])

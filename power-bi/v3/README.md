@@ -157,9 +157,17 @@ L'USL, la LSL et X̄ viennent des colonnes déjà utilisées pour le Cpk.
 
 **Autres changements :**
 - Une 5e tuile *Trend chart* apparaît sur toutes les pages, et une 5e ligne sur la page d'accueil.
-- Page Cpk : le donut Pass & Fail est supprimé. *Cpk pass %* occupe sa carte, avec *n of N characteristics* en
-  dessous, et la mention *To be validated* disparaît.
+- Page Cpk : le donut Pass & Fail est supprimé et *Cpk pass %* occupe sa carte. La mention *To be validated*
+  disparaît. La ligne *n of N characteristics* sous le chiffre a été retirée ensuite, dans le rapport V12.
 - Le filtre de période revient sur *Year* sur toutes les pages.
+
+## V12 : page d'accueil sans bandeau de navigation
+
+Sur la page d'accueil, les lignes ouvrent les pages : le bandeau de gauche des pages d'analyse (tuiles des pages,
+*Clear filters*) n'y est plus. Le panneau bleu du logo va jusqu'au bord gauche.
+
+`update_home_page.py` reconstruit les visuels de la page d'accueil et remplace les fonds de page dans un `.pbix`. Le
+modèle, les données et les autres pages sont gardés : la sortie est un `.pbix`, `out/Quality_Dashboard_V12.pbix`.
 
 ## Logo
 
@@ -201,7 +209,11 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_trend_page.py <V10.pbix> --range 2026-01-01 2026-02-01
    ```
-7. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
+7. Page d'accueil sans bandeau de navigation, dans le `.pbix` V11, après l'étape 1 (modèle et données gardés) :
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_home_page.py <V11.pbix>
+   ```
+8. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_backgrounds.py <V4.pbix>
    ```

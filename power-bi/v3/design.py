@@ -142,13 +142,15 @@ PAGES["home"] = {
     "slicers": [],
     "cards": {},
 }
-HOME_HERO = (RAIL_W, 0, 520, H)
+# Home page: no navigation rail (the rows open the pages), the hero panel goes to the left edge.
+HOME_PAD = 88  # left margin of the hero content
+HOME_HERO = (0, 0, 616, H)
 HOME_ROWS = {key: (648, 96 + i * 90, 608, 80) for i, (_, key) in enumerate(NAV)}  # one row per page
 HOME_GUIDE = (648, 548, 608, 156)
 HOME_FACTS = [("plants", "Plants"), ("months", None), ("values", "Home Measured Values"), ("daily", None)]
 HOME_FACT_Y = {key: 470 + i * 40 for i, (key, _) in enumerate(HOME_FACTS)}  # one line per fact
-HOME_FACT_VALUE = (136, 130, 32)  # x, width, height of a live value (Power BI card) in the facts list
-HOME_REFRESH = (138, 664, 300, 26)
+HOME_FACT_VALUE = (HOME_PAD, 130, 32)  # x, width, height of a live value (Power BI card) in the facts list
+HOME_REFRESH = (HOME_PAD + 2, 664, 300, 26)
 CONTEXT = (X0, SLICER_Y, 820, SLICER_H)          # details page: the part chosen with "Details"
 BACK = (X1 - MORE_W, SLICER_Y, MORE_W, SLICER_H)  # details page: back to Reaction limits
 
@@ -275,6 +277,9 @@ def page_html(page):
     if page in PERIOD_PAGES:
         px, py, pw, ph = PERIOD_TRACK
         track = f'<div class="track" style="left:{px}px;top:{py}px;width:{pw}px;height:{ph}px"></div>'
+    # navigation rail of the analysis pages (the home page has none: its rows open the pages)
+    rail = (f'<div class="rail"></div><svg class="ruler" width="8" height="{H}">{ticks}</svg>'
+            f'{badge_html()}<div class="homelbl">HOME</div>{tiles}')
     header = (f'<div class="band">{tolerance_motif()}</div>{eyebrow_html()}'
               f'<h1>{html.escape(spec["title"])}</h1>{status}<div class="q">{html.escape(spec["question"])}</div>'
               f'<div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>{track}{labels}{plates}')
@@ -350,12 +355,7 @@ def page_html(page):
 {HOME_CSS if page == "home" else ""}
 </style></head><body>
   <div class="dots"></div>
-  {home_body() if page == "home" else header}
-  <div class="rail"></div>
-  <svg class="ruler" width="8" height="{H}">{ticks}</svg>
-  {badge_html().replace('class="badge"', 'class="badge on"') if page == "home" else badge_html()}
-  <div class="homelbl{" on" if page == "home" else ""}">HOME</div>
-  {tiles}
+  {home_body() if page == "home" else header + rail}
 </body></html>'''
 
 
@@ -366,17 +366,17 @@ HOME_CSS = f"""
                       radial-gradient(420px 300px at 100% 100%, rgba(47,110,186,.35), transparent 72%),
                       linear-gradient(160deg, #0A2756 0%, #0E336D 55%, #133F80 100%); }}
   .hero .motif {{ position: absolute; left: -30px; top: 318px; transform: scale(1.22); transform-origin: left top; opacity: .9; }}
-  .hero .logo {{ position: absolute; left: 40px; top: 46px; height: 34px; }}
-  .hero .kicker {{ position: absolute; left: 42px; top: 120px; font-size: 9.5px; font-weight: 600; letter-spacing: .2em;
+  .hero .logo {{ position: absolute; left: {HOME_PAD}px; top: 46px; height: 34px; }}
+  .hero .kicker {{ position: absolute; left: {HOME_PAD + 2}px; top: 120px; font-size: 9.5px; font-weight: 600; letter-spacing: .2em;
                   color: rgba(255,255,255,.56); text-transform: uppercase; }}
-  .hero h1 {{ left: 40px; top: 148px; font-size: 54px; line-height: .95; }}
-  .hero .lead {{ position: absolute; left: 42px; top: 270px; width: 420px; font-size: 12.5px; line-height: 1.6;
+  .hero h1 {{ left: {HOME_PAD}px; top: 148px; font-size: 54px; line-height: .95; }}
+  .hero .lead {{ position: absolute; left: {HOME_PAD + 2}px; top: 270px; width: 420px; font-size: 12.5px; line-height: 1.6;
                 color: rgba(255,255,255,.75); }}
-  .fact {{ position: absolute; left: 42px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
+  .fact {{ position: absolute; left: {HOME_PAD + 2}px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
           color: rgba(255,255,255,.82); }}
   .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; }}
   .fact span {{ position: absolute; left: 140px; white-space: nowrap; }}
-  .hpill {{ position: absolute; left: {HOME_REFRESH[0] - RAIL_W}px; top: {HOME_REFRESH[1]}px; width: {HOME_REFRESH[2]}px;
+  .hpill {{ position: absolute; left: {HOME_REFRESH[0] - HOME_HERO[0]}px; top: {HOME_REFRESH[1]}px; width: {HOME_REFRESH[2]}px;
            height: {HOME_REFRESH[3]}px; border-radius: 13px; background: rgba(255,255,255,.10);
            box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); display: flex; align-items: center; padding-left: 10px; }}
   .start {{ position: absolute; left: 650px; top: 34px; }}
