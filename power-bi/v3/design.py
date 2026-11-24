@@ -149,7 +149,7 @@ HOME_ROWS = {key: (648, 96 + i * 90, 608, 80) for i, (_, key) in enumerate(NAV)}
 HOME_GUIDE = (648, 548, 608, 156)
 HOME_FACTS = [("plants", "Plants"), ("months", None), ("values", "Home Measured Values"), ("daily", None)]
 HOME_FACT_Y = {key: 470 + i * 40 for i, (key, _) in enumerate(HOME_FACTS)}  # one line per fact
-HOME_FACT_VALUE = (HOME_PAD, 130, 32)  # x, width, height of a live value (Power BI card) in the facts list
+HOME_FACT_VALUE = (HOME_PAD + 2, 130, 32)  # x, width, height of a live value (Power BI card): right-aligned
 HOME_REFRESH = (HOME_PAD + 2, 664, 300, 26)
 CONTEXT = (X0, SLICER_Y, 820, SLICER_H)          # details page: the part chosen with "Details"
 BACK = (X1 - MORE_W, SLICER_Y, MORE_W, SLICER_H)  # details page: back to Reaction limits
@@ -194,8 +194,9 @@ def icon(name, size, color, sw=1.6):
             f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">{ICONS[name]}</svg>')
 
 
-def tolerance_motif():
-    """USL / LSL band with a measurement signal: one value out of the reaction limits, in Fail orange."""
+def tolerance_motif(fade=True):
+    """USL / LSL band with a measurement signal: one value out of the reaction limits, in Fail orange.
+    fade: the left end fades out (page headers, next to the title); the home hero shows it whole."""
     pts, import_math = [], __import__("math")
     for i in range(0, 61):
         x = 6 + i * 6.4
@@ -209,7 +210,7 @@ def tolerance_motif():
       <defs><linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/>
         <stop offset=".25" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="1"/></linearGradient>
         <mask id="m"><rect width="400" height="74" fill="url(#fade)"/></mask></defs>
-      <g mask="url(#m)">
+      <g{' mask="url(#m)"' if fade else ''}>
         <rect x="0" y="14" width="400" height="44" fill="rgba(255,255,255,.035)"/>
         <path d="M0 14H400M0 58H400" stroke="rgba(255,255,255,.22)" stroke-dasharray="4 5" stroke-width="1"/>
         <path d="M0 36H400" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
@@ -365,7 +366,8 @@ HOME_CSS = f"""
           background: radial-gradient(520px 360px at 20% 0%, rgba(110,170,235,.35), transparent 70%),
                       radial-gradient(420px 300px at 100% 100%, rgba(47,110,186,.35), transparent 72%),
                       linear-gradient(160deg, #0A2756 0%, #0E336D 55%, #133F80 100%); }}
-  .hero .motif {{ position: absolute; left: -30px; top: 318px; transform: scale(1.22); transform-origin: left top; opacity: .9; }}
+  .hero .motif {{ position: absolute; left: {HOME_PAD}px; top: 340px; transform: scale({(HOME_HERO[2] - 2 * HOME_PAD) / 400});
+                 transform-origin: left top; opacity: .9; }}
   .hero .logo {{ position: absolute; left: {HOME_PAD}px; top: 46px; height: 34px; }}
   .hero .kicker {{ position: absolute; left: {HOME_PAD + 2}px; top: 120px; font-size: 9.5px; font-weight: 600; letter-spacing: .2em;
                   color: rgba(255,255,255,.56); text-transform: uppercase; }}
@@ -374,7 +376,7 @@ HOME_CSS = f"""
                 color: rgba(255,255,255,.75); }}
   .fact {{ position: absolute; left: {HOME_PAD + 2}px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
           color: rgba(255,255,255,.82); }}
-  .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; }}
+  .fact b {{ font: 600 15px "Segoe UI Semibold", Inter, sans-serif; color: #fff; width: 130px; text-align: right; }}
   .fact span {{ position: absolute; left: 140px; white-space: nowrap; }}
   .hpill {{ position: absolute; left: {HOME_REFRESH[0] - HOME_HERO[0]}px; top: {HOME_REFRESH[1]}px; width: {HOME_REFRESH[2]}px;
            height: {HOME_REFRESH[3]}px; border-radius: 13px; background: rgba(255,255,255,.10);
@@ -483,7 +485,7 @@ def home_body():
              f'measured once<br><b>Violation</b> a value that passes but is outside the reaction (alert) limits · '
              f'<b>Cpk</b> process capability, min(USL − mean, mean − LSL) / 3σ<br>'
              f'Results not assessed or not evaluated are left out of the percentages</div></div>')
-    return (f'<div class="hero">{tolerance_motif()}{logo_html}<div class="kicker">Plant Visual Management</div>'
+    return (f'<div class="hero">{tolerance_motif(fade=False)}{logo_html}<div class="kicker">Plant Visual Management</div>'
             f'<h1>Quality<br>Dashboard</h1><div class="lead">The daily review of quality results in series production: '
             f'inspections, measured values, reaction limits and capability, for every plant.</div>{fact_html}'
             f'<div class="hpill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div></div>'
