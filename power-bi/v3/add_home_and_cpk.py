@@ -26,6 +26,7 @@ sys.path.insert(0, str(HERE))
 import add_reaction_limits as A  # noqa: E402  (cloning helpers, checks, page-2 index)
 import cpk_model as cm  # noqa: E402
 import design as D  # noqa: E402
+import period_model as pm  # noqa: E402
 import pbit_package as pkg  # noqa: E402
 import restyle as R  # noqa: E402
 from restyle import B, C, N, P, S, SEL  # noqa: E402
@@ -98,7 +99,7 @@ def retarget_slicer(v, entity, name, display, sync=None):
 
 
 # --------------------------------------------------------------------------- page 4: Cpk
-def build_cpk_page(src, idx, p1, page_ids):
+def build_cpk_page(src, idx, p1, donut_like, page_ids):
     cards = D.PAGES["cpk"]["cards"]
     out, panel_map = [], {}
 
@@ -132,7 +133,7 @@ def build_cpk_page(src, idx, p1, page_ids):
     kpi["visual"]["visualContainerObjects"] = R.vco_card("Cpk pass %", "Characteristics with Cpk ≥ threshold",
                                                          pad=(12, 2, 16, 16), header=False)
     # Cpk Pass & Fail donut, under the figure, in the same card
-    donut = add(A.clone(next(v for v in p1.values() if v["visual"]["visualType"] == "donutChart")))
+    donut = add(A.clone(donut_like))
     A.place(donut, kx + 8, ky + D.CPK_FIGURE_H - 4, kw - 16, kh - D.CPK_FIGURE_H)
     query(donut, {"Category": [projection("Cpk Status", "Column", "Status", "Status", active=True)],
                   "Y": [projection(T, "Measure", "Cpk Status Count", "Characteristics")]})
@@ -267,6 +268,12 @@ def main():
     zin = zipfile.ZipFile(args.pbix)
     defs = pkg.definitions(zin)
     meta = defs["pages/pages.json"]
+    # The Cpk donut is cloned from the Overview donut, or from the Cpk page itself once Overview has none (V10).
+    donuts = sorted((defs[f"pages/{k.split('/')[1]}/page.json"]["displayName"] != "Overview", k)
+                    for k, v in defs.items() if "/visuals/" in k and v["visual"]["visualType"] == "donutChart")
+    if not donuts:
+        sys.exit("no donut chart to copy for the Cpk page")
+    donut_like = copy.deepcopy(defs[donuts[0][1]])
     had_pages = bool(strip_new_pages(defs, meta))
     page_keys = {}
     for pid in meta["pageOrder"]:
@@ -301,7 +308,7 @@ def main():
             defs[f"pages/{pid}/visuals/{v['name']}/visual.json"] = v
 
     p1 = visuals_of(page_ids["overview"])
-    cpk_visuals, panel_map, more_btn, status_slicer = build_cpk_page(src, idx, p1, page_ids)
+    cpk_visuals, panel_map, more_btn, status_slicer = build_cpk_page(src, idx, p1, donut_like, page_ids)
     home_visuals = build_home_page(src, idx, page_ids)
 
     # bookmarks of the Cpk "More filters" panel: those of page 2, plus the third filter
@@ -382,25 +389,12 @@ def main():
         settings["range_start"], settings["range_end"] = args.range
     work = HERE / "out" / "v9"
     work.mkdir(parents=True, exist_ok=True)
-    model_dir = bt.write_model(work, settings, extra_measures=cm.CPK_MEASURES + cm.HOME_MEASURES,
-                               extra_tables=cm.extra_tables(), policy=cm.QT_POLICY)
+    model_dir = pm.write_model(work, settings)
     model_json = bt.model_schema(model_dir, work / "DataModelSchema.json")
     pkg.check_fields(defs, model_json)
 
     dst = HERE / "out" / f"{OUT_NAME}.pbit"
-    skip = pkg.REPLACED | {f"Report/StaticResources/RegisteredResources/{n}" for n in old}
-    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("Version", zin.read("Version"))
-        z.writestr("[Content_Types].xml", pkg.content_types(zin.read("[Content_Types].xml")))
-        z.writestr("DataModelSchema", (work / "DataModelSchema.json").read_bytes())
-        z.writestr("DiagramLayout", json.dumps(bt.diagram_layout(model_json)).encode("utf-16-le"))
-        for n in zin.namelist():
-            if n not in skip and not n.startswith(pkg.PREFIX):
-                z.writestr(n, zin.read(n))
-        for k, v in sorted(defs.items()):
-            z.writestr(pkg.PREFIX + k, json.dumps(v, ensure_ascii=False, separators=(",", ":")))
-        for n, data in images.items():
-            z.writestr("Report/StaticResources/RegisteredResources/" + n, data)
+    pkg.write_template(zin, defs, images, old, dst, work / "DataModelSchema.json", bt.diagram_layout(model_json))
     print(f"written {dst} ({dst.stat().st_size:,} bytes), range {settings['range_start']} .. {settings['range_end']}")
 
 

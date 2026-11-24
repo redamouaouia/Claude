@@ -99,6 +99,37 @@ Une sélection suit donc d'une page à l'autre, date comprise.
 - L'USL et la LSL sont celles de la dernière mesure de chaque période chargée. Sur plusieurs périodes, le calcul garde
   la plus haute.
 
+## V10 : retours client sur Overview, filtre de période
+
+`add_period_filter.py` applique les retours client à la V9 et produit `out/Quality_Dashboard_V10.pbit`. Le modèle
+change, donc les données se rechargent à l'ouverture.
+
+- **Overview** : le donut *Pass & Fail %* est supprimé, et la courbe mensuelle prend sa place. Le chiffre *Pass rate*
+  et sa jauge suivent désormais tous les filtres : avant, ils montraient les 12 derniers mois avec le seul filtre
+  Plant. Leur sous-titre indique la période choisie.
+- **Filtre de période**, sous l'heure d'actualisation, sur Overview, Characteristics, Reaction limits et Cpk :
+  - *Day* : les 24 dernières heures ;
+  - *WTD* : depuis lundi ;
+  - *MTD* : depuis le 1er du mois ;
+  - *YTD* : depuis le 1er janvier ;
+  - *Year* : les 12 derniers mois, choisi par défaut.
+
+  Le filtre est synchronisé : la même période s'applique à toutes les pages. Il s'ajoute aux autres filtres, date
+  comprise. *Clear filters* le vide aussi : toutes les données chargées sont alors prises (environ 12 mois dans le
+  service).
+
+Comment c'est construit (`period_model.py`) :
+- Les heures de mesure sont l'heure locale de chaque usine. Les 24 heures de *Day* sont donc comptées depuis la
+  dernière mesure de chaque usine (sur les 2 derniers jours). Une heure à plus de 14 h dans le futur est ignorée.
+- La requête ajoute à `Quality Tracker` la colonne masquée `Period Key` : la date au format aaaammjj × 10, + 1 si la
+  valeur est dans les 24 dernières heures de son usine.
+- La table `Period`, recalculée à chaque actualisation à partir du jour de l'actualisation (UTC), donne pour chaque
+  période les `Period Key` qu'elle garde.
+- Une relation plusieurs-à-plusieurs, dans un seul sens, de `Period` vers `Quality Tracker` : chaque visuel suit le
+  filtre sans changer ses mesures.
+- Les 7 derniers jours sont actualisés à chaque fois (actualisation incrémentielle). Le repère des 24 heures est donc
+  toujours à jour.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -131,7 +162,11 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_home_and_cpk.py <V8.pbix> --range 2026-01-01 2026-02-01
    ```
-5. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
+5. Appliquer les retours client (V10 : Overview, filtre de période) au `.pbix` V9, après l'étape 1 :
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_period_filter.py <V9.pbix> --range 2026-01-01 2026-02-01
+   ```
+6. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_backgrounds.py <V4.pbix>
    ```
@@ -155,7 +190,8 @@ Databricks, et chaque règle de la version SQL devient une étape Power Query.
 Différences de modèle :
 - `Inspection ID` est un texte (*clé ordre-plan-indice | test | date-heure*), alors que la version SQL le réduit à un
   entier avec `xxhash64` ;
-- le rapport V3 n'a pas de page Cpk, donc les colonnes *Cpk sums* ne sont pas calculées.
+- le rapport V3 n'a ni page Cpk ni filtre de période, donc les colonnes *Cpk sums* et `Period Key` ne sont pas
+  calculées.
 
 Les noms des autres colonnes ne changent pas : le rapport n'est pas modifié.
 

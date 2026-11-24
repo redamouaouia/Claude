@@ -121,9 +121,10 @@ in
     Typed"""
 
 # Inspection ID is a text key here (the SQL version hashes it to an integer with Databricks' xxhash64).
-# The V3 report has no Cpk page: the Cpk sums of the SQL version are left out.
+# The V3 report has neither the Cpk page nor the period filter: the Cpk sums and the Period Key of the SQL version
+# are left out.
 COLUMNS = [("Inspection ID", "string", "type text", True, None) if c[0] == "Inspection ID" else c
-           for c in bt.COLUMNS if not c[0].startswith("Cpk ")]
+           for c in bt.COLUMNS if not c[0].startswith("Cpk ") and c[0] != "Period Key"]
 # The step "Keep model columns" must list exactly the model columns, in the same order.
 _kept = PQ_M.split('#"Keep model columns"')[1].split("{", 1)[1].split("}", 1)[0]
 assert [x.strip().strip('"') for x in _kept.split(",")] == [c[0] for c in COLUMNS], "PQ_M and COLUMNS differ"

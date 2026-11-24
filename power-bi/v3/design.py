@@ -26,6 +26,8 @@ NAV_TILES = {k: (10, 96 + i * 74, 76, 64) for i, (_, k) in enumerate(NAV)}
 BADGE = (20, 16, 56, 56)  # company symbol at the top of the rail: the Home button of every page
 CLEAR_TILE = (10, 636, 76, 64)
 REFRESH_PILL = (966, 22, 290, 26)
+PERIOD_TRACK = (966, 54, 290, 26)  # period filter (Day, WTD, MTD, YTD, Year), under the refresh time
+PERIOD_PAGES = ("overview", "chars", "rl", "cpk")
 DATE_W, MORE_W = 250, 132  # fixed widths: two date boxes, and the full "More filters · N" label
 
 
@@ -46,10 +48,10 @@ PAGES = {
         "slicers": [("Plant", "Plant", 0.8), ("Part", "Part · inspection plan", 1.2), ("Test", "Test", 1.1),
                     ("Inspection Reason", "Inspection reason", 1.1), ("Date", "Date", 1.45)],
         "more_count": 2,
+        # The Pass & Fail % donut was removed at the client's request: the monthly line takes its place.
         "cards": {
             "hero": (X0, ROW2_Y, 300, ROW2_H),
-            "line": (440, ROW2_Y, 500, ROW2_H),
-            "donut": (956, ROW2_Y, 300, ROW2_H),
+            "line": (440, ROW2_Y, X1 - 440, ROW2_H),
             "decomp": (X0, ROW3_Y, 760, ROW3_H),
             "table": (900, ROW3_Y, 356, ROW3_H),
         },
@@ -114,6 +116,7 @@ PAGES["cpk"] = {
         "table": (X0, ROW2_Y + 230 + GAP, X1 - X0, H - 16 - (ROW2_Y + 230 + GAP)),
     },
 }
+FORMER_DONUT = (956, ROW2_Y, 300, ROW2_H)  # Overview donut until V9 (restyle.py), removed by add_period_filter.py
 CPK_FIGURE_H = 128  # height of the Cpk pass % figure in its card (as the hero of page 1: below, it gets cut)
 PAGES["home"] = {
     # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
@@ -250,9 +253,13 @@ def page_html(page):
     if spec.get("status"):
         width = 15 + 17.5 * len(spec["title"])  # title in Barlow Semi Condensed 33 px
         status = f'<div class="status" style="left:{X0 + width:.0f}px">{html.escape(spec["status"])}</div>'
+    track = ""
+    if page in PERIOD_PAGES:
+        px, py, pw, ph = PERIOD_TRACK
+        track = f'<div class="track" style="left:{px}px;top:{py}px;width:{pw}px;height:{ph}px"></div>'
     header = (f'<div class="band">{tolerance_motif()}</div>{eyebrow_html()}'
               f'<h1>{html.escape(spec["title"])}</h1>{status}<div class="q">{html.escape(spec["question"])}</div>'
-              f'<div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>{labels}{plates}')
+              f'<div class="pill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div>{track}{labels}{plates}')
     return f'''<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap">
 <style>
@@ -308,6 +315,8 @@ def page_html(page):
   .pill {{ position: absolute; left: {rx}px; top: {ry}px; width: {rw}px; height: {rh}px; border-radius: {rh / 2}px;
           background: rgba(255,255,255,.10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
           display: flex; align-items: center; padding-left: 10px; }}
+  .track {{ position: absolute; border-radius: 13px; background: rgba(255,255,255,.07);
+           box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); }}
   .flabel {{ position: absolute; font-size: 8.8px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase;
             color: rgba(255,255,255,.62); white-space: nowrap; overflow: hidden; }}
   .plate {{ position: absolute; border-radius: 16px; background: #fff;

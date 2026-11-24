@@ -45,7 +45,9 @@ La jauge « 12 derniers mois » ne montre donc que cette période tant que le ra
   - `RL Time`, `RL Value`, `RL Low Limit`, `RL High Limit`, `RL LSL` et `RL USL` : la date et l'heure, la valeur,
     les limites de réaction et la tolérance, remplies seulement pour ces violations (page de détail) ;
   - les sommes du Cpk (dossier *Cpk sums*), sur une ligne par caractéristique, motif d'inspection et jour (page Cpk
-    de la V3).
+    de la V3) ;
+  - `Period Key`, le lien avec le filtre de période de la V10 : la date, et si la valeur est dans les 24 dernières
+    heures de son usine.
 
   Power Query ajoute `Refreshed At`, l'heure de l'actualisation en UTC. La mesure `Last Refresh` en affiche la plus
   récente.

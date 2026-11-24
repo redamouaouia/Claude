@@ -42,8 +42,19 @@ IN_CPK = ("characteristic_type = 'variable' AND characteristic_status IN ('OK', 
 CPK_KEY = "plant, part_name, process, characteristic"  # one Cpk per plant, part, test and characteristic
 CPK_ORDER = "date_time, key_order_inspection_plan_index_plant"  # time order of the values (moving ranges)
 WHERE_MARK = "  {where}"
+# Period "Day" (last 24 hours): measurement times are the local time of each plant, so the 24 hours are counted back
+# from the latest measurement of each plant (last 2 days; a time more than 14 hours ahead of UTC is a typo).
+LATEST_SQL = [
+    "WITH latest AS (",
+    "  SELECT plant AS latest_plant,",
+    "    max(date_time) FILTER (WHERE date_time <= current_timestamp() + INTERVAL 14 HOURS) AS latest_time",
+    f"  FROM {SOURCE_TABLE}",
+    "  WHERE posting_date >= date_sub(current_date(), 2)",
+    "  GROUP BY plant",
+    "), src AS (",
+]
 SQL_LINES = [
-    "WITH src AS (",
+    *LATEST_SQL,
     "  SELECT",  # the 21 columns read from the table (out of 65), and the values derived from them
     "    plant, posting_date, process, characteristic, characteristic_status, process_status,",
     "    key_order_inspection_plan_index_plant, process_id, date_time, bmm_machine, kpc, key_kpc,",
@@ -99,8 +110,12 @@ SQL_LINES = [
       for (src, name), sep in zip([("xxhash64(plant, part_name, process, characteristic)", "Cpk Group"),
                                    ("cpk_count", "Cpk Value Count"), ("cpk_sum", "Cpk Value Sum"),
                                    ("cpk_range_count", "Cpk Range Count"), ("cpk_range_sum", "Cpk Range Sum"),
-                                   ("cpk_usl", "Cpk USL"), ("cpk_lsl", "Cpk LSL")], [","] * 6 + [""])],
-    "FROM sums",
+                                   ("cpk_usl", "Cpk USL"), ("cpk_lsl", "Cpk LSL")], [","] * 7)],
+    # Key of the period filter (table Period): the date as yyyymmdd x 10, + 1 for the last 24 hours of the plant.
+    "  (year(posting_date) * 10000 + month(posting_date) * 100 + day(posting_date)) * 10",
+    "    + CASE WHEN date_time > latest_time - INTERVAL 24 HOURS AND date_time <= latest_time THEN 1 ELSE 0 END"
+    " AS `Period Key`",
+    "FROM sums LEFT JOIN latest ON plant = latest_plant",
 ]
 SQL_WHERE = "WHERE posting_date >= DATE'{start}' AND posting_date < DATE'{end}'"
 SQL_ORDER = "ORDER BY `Plant`, `Date`, `Inspection ID`"
@@ -141,6 +156,7 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("Cpk USL", "double", "type number", True, "0.####"),
     ("Cpk LSL", "double", "type number", True, "0.####"),
     ("Refreshed At", "dateTime", "type datetime", True, "General Date"),
+    ("Period Key", "int64", "Int64.Type", True, "0"),
 ]
 CPK_SUMS = "Filled on one row per characteristic, inspection reason and day (its last measurement), empty elsewhere."
 RL_DETAIL = "Only filled for values outside the reaction limits (RL Violation = 1)."
@@ -160,6 +176,8 @@ COLUMN_INFO = {  # name: (display folder, description)
     "Cpk USL": ("Cpk sums", "Upper specification limit of the last measurement of the group. " + CPK_SUMS),
     "Cpk LSL": ("Cpk sums", "Lower specification limit of the last measurement of the group. " + CPK_SUMS),
     "Refreshed At": (None, "Time (UTC) of the refresh that loaded the row; the latest one is the last refresh."),
+    "Period Key": (None, "Link to the period filter (table Period): date as yyyymmdd x 10, + 1 when the value is in "
+                         "the last 24 hours of its plant (counted back from the latest measurement of the plant)."),
 }
 
 
@@ -304,10 +322,12 @@ def table_tmdl(name, columns, measures, source_m, info=None, sort_by=None, polic
     return "\n".join(lines) + "\n"
 
 
-def write_model(out, settings, source_m=None, columns=None, extra_measures=(), extra_tables=(), policy=None):
+def write_model(out, settings, source_m=None, columns=None, extra_measures=(), extra_tables=(), policy=None,
+                relationships=()):
     """TMDL model in out/model. source_m / columns replace the Quality Tracker query and column list (variants).
     extra_measures go to Quality Tracker, extra_tables are table_tmdl() keyword arguments, policy is the
-    incremental refresh policy of Quality Tracker."""
+    incremental refresh policy of Quality Tracker. relationships: (from table, from column, to table, to column,
+    to cardinality), filters flowing from the "to" table to the "from" table."""
     source_m = source_m or m_source()
     columns = columns or COLUMNS
     model_dir = out / "model"
@@ -342,6 +362,13 @@ def write_model(out, settings, source_m=None, columns=None, extra_measures=(), e
     (model_dir / "tables" / f"{T}.tmdl").write_text(
         table_tmdl(T, columns, list(MEASURES) + list(extra_measures), source_m, info=COLUMN_INFO, policy=policy))
 
+    if relationships:
+        rel = []
+        for from_table, from_col, to_table, to_col, to_card in relationships:
+            rel += [f"relationship {uuid.uuid4()}", f"\tfromColumn: {tmdl_name(from_table)}.{tmdl_name(from_col)}",
+                    f"\ttoColumn: {tmdl_name(to_table)}.{tmdl_name(to_col)}", "\tfromCardinality: many",
+                    f"\ttoCardinality: {to_card}", "\tcrossFilteringBehavior: oneDirection", ""]
+        (model_dir / "relationships.tmdl").write_text("\n".join(rel) + "\n")
     return model_dir
 
 

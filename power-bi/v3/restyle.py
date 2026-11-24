@@ -375,7 +375,7 @@ def restyle_page(page_key, visuals, new_visuals, removed):
             vis["visualContainerObjects"] = vco_card("Pass % per month",
                                                      "Inspection pass rate per month · dashed line = 95 % target")
         elif slot == "donutChart":
-            place(v, *cards["donut"])
+            place(v, *cards.get("donut", D.FORMER_DONUT))  # removed later by add_period_filter.py
             o = vis["objects"]
             o["slices"] = [P(innerRadiusRatio=I(72), startAngle=I(0))]
             o["dataPoint"] = [d for d in o["dataPoint"] if "selector" in d] + [
