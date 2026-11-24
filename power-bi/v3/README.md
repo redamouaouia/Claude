@@ -166,6 +166,9 @@ L'USL, la LSL et X̄ viennent des colonnes déjà utilisées pour le Cpk.
 Sur la page d'accueil, les lignes ouvrent les pages : le bandeau de gauche des pages d'analyse (tuiles des pages,
 *Clear filters*) n'y est plus. Le panneau bleu du logo va jusqu'au bord gauche.
 
+Le rapport s'appelle désormais **Plant visual management dashboard** (`design.REPORT_TITLE`). Ce titre apparaît
+dans la ligne du haut de chaque page et, sur trois lignes, sur la page d'accueil, sous « Quality ».
+
 `update_home_page.py` reconstruit les visuels de la page d'accueil et remplace les fonds de page dans un `.pbix`. Le
 modèle, les données et les autres pages sont gardés : la sortie est un `.pbix`, `out/Quality_Dashboard_V12.pbix`.
 

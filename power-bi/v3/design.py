@@ -1,4 +1,4 @@
-"""Shared geometry and the page-background artwork for Quality Dashboard V3.
+"""Shared geometry and the page-background artwork of the report (Plant visual management dashboard).
 
 The backgrounds are drawn in HTML/CSS and rendered at 2x (2560 x 1440) with Chromium. Every white card plate,
 filter label and title in the artwork sits exactly under the native Power BI visual that uses the same
@@ -10,6 +10,10 @@ import pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 BRAND = HERE / "out" / "brand"  # white logo files made by make_logo_assets.py (not stored in the repository)
+
+# Name of the report (top line of every page, home page title)
+REPORT_TITLE = "Plant visual management dashboard"
+REPORT_TITLE_LINES = ("Plant visual", "management", "dashboard")  # the home page title, on three lines
 
 # --------------------------------------------------------------------------- canvas geometry (Power BI px)
 W, H = 1280, 720
@@ -136,8 +140,8 @@ PAGES["trend"] = {
 }
 PAGES["home"] = {
     # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
-    "title": "Quality Dashboard",
-    "question": "Plant Visual Management",
+    "title": REPORT_TITLE,
+    "question": "Quality",
     "nav": "home",
     "slicers": [],
     "cards": {},
@@ -239,7 +243,7 @@ def badge_html():
 
 
 def eyebrow_html():
-    rest = "Quality Dashboard &nbsp;·&nbsp; Plant Visual Management"
+    rest = html.escape(REPORT_TITLE)
     logo = BRAND / "logo_white.png"
     if not logo.exists():
         return f'<div class="eyebrow">OPmobility &nbsp;·&nbsp; {rest}</div>'
@@ -366,13 +370,13 @@ HOME_CSS = f"""
           background: radial-gradient(520px 360px at 20% 0%, rgba(110,170,235,.35), transparent 70%),
                       radial-gradient(420px 300px at 100% 100%, rgba(47,110,186,.35), transparent 72%),
                       linear-gradient(160deg, #0A2756 0%, #0E336D 55%, #133F80 100%); }}
-  .hero .motif {{ position: absolute; left: {HOME_PAD}px; top: 340px; transform: scale({(HOME_HERO[2] - 2 * HOME_PAD) / 400});
+  .hero .motif {{ position: absolute; left: {HOME_PAD}px; top: 360px; transform: scale({(HOME_HERO[2] - 2 * HOME_PAD) / 400});
                  transform-origin: left top; opacity: .9; }}
   .hero .logo {{ position: absolute; left: {HOME_PAD}px; top: 46px; height: 34px; }}
   .hero .kicker {{ position: absolute; left: {HOME_PAD + 2}px; top: 120px; font-size: 9.5px; font-weight: 600; letter-spacing: .2em;
                   color: rgba(255,255,255,.56); text-transform: uppercase; }}
-  .hero h1 {{ left: {HOME_PAD}px; top: 148px; font-size: 54px; line-height: .95; }}
-  .hero .lead {{ position: absolute; left: {HOME_PAD + 2}px; top: 270px; width: 420px; font-size: 12.5px; line-height: 1.6;
+  .hero h1 {{ left: {HOME_PAD}px; top: 146px; font-size: 46px; line-height: .95; }}
+  .hero .lead {{ position: absolute; left: {HOME_PAD + 2}px; top: 296px; width: 420px; font-size: 12.5px; line-height: 1.6;
                 color: rgba(255,255,255,.75); }}
   .fact {{ position: absolute; left: {HOME_PAD + 2}px; display: flex; align-items: center; height: 32px; font-size: 10.5px;
           color: rgba(255,255,255,.82); }}
@@ -485,8 +489,9 @@ def home_body():
              f'measured once<br><b>Violation</b> a value that passes but is outside the reaction (alert) limits · '
              f'<b>Cpk</b> process capability, min(USL − mean, mean − LSL) / 3σ<br>'
              f'Results not assessed or not evaluated are left out of the percentages</div></div>')
-    return (f'<div class="hero">{tolerance_motif(fade=False)}{logo_html}<div class="kicker">Plant Visual Management</div>'
-            f'<h1>Quality<br>Dashboard</h1><div class="lead">The daily review of quality results in series production: '
+    title = "<br>".join(html.escape(line) for line in REPORT_TITLE_LINES)
+    return (f'<div class="hero">{tolerance_motif(fade=False)}{logo_html}<div class="kicker">Quality</div>'
+            f'<h1>{title}</h1><div class="lead">The daily review of quality results in series production: '
             f'inspections, measured values, reaction limits and capability, for every plant.</div>{fact_html}'
             f'<div class="hpill">{icon("clock", 13, "rgba(255,255,255,.72)", 1.7)}</div></div>'
             f'<div class="start"><b>Where do you want to start?</b><span>Each page answers one question. '
