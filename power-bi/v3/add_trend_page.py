@@ -79,24 +79,36 @@ def update_cpk_page(defs, pid, card_like):
            and "Cpk Pass Of Total" in json.dumps(v)]
     for k in old:  # from an earlier run
         del defs[k]
-    total = A.clone(card_like)
-    A.place(total, kx + 16, ky + 112, kw - 32, 26)  # just under the figure (40 pt)
-    H.query(total, {"Values": [H.projection(T, "Measure", "Cpk Pass Of Total", "Characteristics")]})
-    total["visual"]["objects"] = {
-        "labels": [P(color=C(R.MUTED), fontSize=N(10), fontFamily=S("Segoe UI"))],
-        "categoryLabels": [P(show=B(False))],
-        "wordWrap": [P(show=B(False))]}
-    total["visual"]["visualContainerObjects"] = R.vco_plain()
+    total = text_line(card_like, (kx + 16, ky + 112, kw - 32, 26), "Cpk Pass Of Total", "Characteristics")
     total["position"]["z"] = total["position"]["tabOrder"] = kpi["position"]["z"] + 1
     defs[f"pages/{pid}/visuals/{total['name']}/visual.json"] = total
 
 
+def text_line(card_like, rect, measure_name, display):
+    """One line of text from a measure, in a plain card (as the refresh time): grey, no background."""
+    v = A.clone(card_like)
+    A.place(v, *rect)
+    H.query(v, {"Values": [H.projection(T, "Measure", measure_name, display)]})
+    v["visual"]["objects"] = {
+        "labels": [P(color=C(R.MUTED), fontSize=N(10), fontFamily=S("Segoe UI"))],
+        "categoryLabels": [P(show=B(False))],
+        "wordWrap": [P(show=B(False))]}
+    v["visual"]["visualContainerObjects"] = R.vco_plain()
+    return v
+
+
 # --------------------------------------------------------------------------- page 5: Trend chart
-def kpi_card(hero, rect, title, subtitle, value_measure, display):
+def kpi_card(hero, rect, title, subtitle, value_measure, display, units=None, blank=None):
+    """Card with a title, a fixed subtitle and one figure (measures in titles of this card type: see V11 fix)."""
     v = A.clone(hero)
     A.place(v, *rect)
     H.query(v, {"Data": [H.projection(T, "Measure", value_measure, display)]})
-    v["visual"]["objects"]["value"][0]["properties"]["fontSize"] = N(24)
+    value = v["visual"]["objects"]["value"][0]["properties"]
+    value["fontSize"] = N(24)
+    if units is not None:
+        value["labelDisplayUnits"] = N(units)
+    if blank is not None:
+        value["showBlankAs"] = S(blank)
     v["visual"]["visualContainerObjects"] = R.vco_card(title, subtitle, pad=(12, 2, 16, 16), header=False)
     return v
 
@@ -127,14 +139,16 @@ def trend_chart(line_like, rect):
             "dataLabelColor": C(color), "dataLabelHorizontalPosition": S("right"),
             "dataLabelVerticalPosition": S("above")}, {"id": str(i + 1)}) for i, (name, m, color, style) in enumerate(LIMITS)],
     }
-    vco = R.vco_card("Trend chart – measured values vs limits", " ")
+    # Title and subtitle from measures: what to select while the filters leave several characteristics.
+    vco = R.vco_card("Trend chart", " ")
+    vco["title"][0]["properties"]["text"] = measure("Trend Title")
     A.dynamic_subtitle(vco, "Trend Subtitle")
     v["visual"]["visualContainerObjects"] = vco
     v.pop("filterConfig", None)
     return v
 
 
-def build_trend_page(src, idx, p1, page_ids):
+def build_trend_page(src, idx, p1, card_like, page_ids):
     """Visuals of the trend page, the names of its "More filters" panel copies, and its More filters button."""
     cards = D.PAGES["trend"]["cards"]
     out, panel_map = [], {}
@@ -160,10 +174,13 @@ def build_trend_page(src, idx, p1, page_ids):
 
     hero = next(v for v in p1.values() if v["visual"]["visualType"] == "cardVisual")
     add(kpi_card(hero, cards["violations"], "Reaction limit violations",
-                 "Values outside the reaction limits · current filters", "RL Violations", "Violations"))
-    cpk = add(kpi_card(hero, cards["cpk"], "Cpk", " ", "Trend Cpk", "Cpk"))
-    A.dynamic_subtitle(cpk["visual"]["visualContainerObjects"], "Trend Cpk Goal")
-    cpk["visual"]["objects"]["value"][0]["properties"]["fontColor"] = {"solid": {"color": measure("Trend Cpk Color")}}
+                 "Values outside the reaction limits · current filters", "RL Violations", "Violations", units=1))
+    # Cpk, and under it the goal with Pass / Fail as a line of text (a measure in the subtitle of this card type
+    # was refused by Power BI Desktop).
+    cx, cy, cw, _ = cards["cpk"]
+    add(kpi_card(hero, cards["cpk"], "Cpk", "Goal = Cpk threshold of More filters (1.33 if none)", "Trend Cpk", "Cpk",
+                 blank="–"))
+    add(text_line(card_like, (cx + 16, cy + 86, cw - 32, 24), "Trend Cpk Goal", "Goal"))
     line_like = next(v for v in p1.values() if v["visual"]["visualType"] == "lineChart")
     add(trend_chart(line_like, cards["chart"]))
 
@@ -248,7 +265,7 @@ def main():
     update_cpk_page(defs, keys["cpk"], card_like)
 
     # Trend chart page
-    visuals, panel_map, more_btn = build_trend_page(src, idx, p1, keys)
+    visuals, panel_map, more_btn = build_trend_page(src, idx, p1, card_like, keys)
     page = copy.deepcopy(defs[f"pages/{keys['chars']}/page.json"])
     page["name"], page["displayName"] = keys["trend"], TREND_TITLE
     page.pop("filterConfig", None)

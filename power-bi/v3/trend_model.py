@@ -48,7 +48,10 @@ TREND_MEASURES = [  # (name, expression, format, folder, description, dynamic fo
      '\t\tc & " · " & p & " · " & t & " · " & FORMAT(n, "#,0") & " measured values"\n\t)',
      None, "Trend", "Subtitle of the trend chart: what it shows, or what to select.", None),
     ("Trend Cpk", f"IF({GROUPS} = 1, [Cpk Value])", "0.00", "Trend", "Cpk of the characteristic shown.", None),
-    ("Trend Cpk Color", f"IF({GROUPS} = 1, [Cpk Status Color])", None, "Trend", None, None),
+    ("Trend Title",
+     f'IF({GROUPS} = 1, "Trend chart – measured values vs limits", '
+     '"Trend chart – select one part, one test and one characteristic")',
+     None, "Trend", "Title of the trend chart: says what to select while the chart is empty.", None),
     ("Trend Cpk Goal",
      'VAR goal = "Goal " & FORMAT([Cpk Threshold], "0.00")\nRETURN\n'
      f'\tIF({GROUPS} = 1, goal & " · " & [Cpk Status Label], goal & " · select one characteristic")',
