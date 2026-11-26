@@ -207,6 +207,25 @@ Le modèle reçoit deux mesures (`overview_model.py`) : `Pass % Gap` (format `+0
 sortie est donc un modèle `.pbit` : `out/Plant visual management dashboard V13.pbit` (données rechargées à l'ouverture).
 `add_overview_figures.py` part du `.pbix` du design A.
 
+## Design Relief (concept premium 2)
+
+Choisi parmi trois propositions « premium » (Verre, Relief, Nuit). C'est l'évolution du design A, avec de la
+profondeur et les coins continus des interfaces Apple (`corner-shape: squircle`), dessinés dans les fonds de page :
+- **Rail marine flottant** (détaché des bords, reflets et ombre) : la page active est un bouton blanc en relief ;
+  la dernière actualisation est dans un encart en creux.
+- **Cartes blanches en relief** : ombres en plusieurs couches, lumière venant du haut.
+- **Filtres et période dans des champs en creux** : la période choisie est une tuile blanche ; *More filters* et
+  *Back* sont des boutons en relief dessinés (leurs zones de texte sont masquées).
+- **Overview** : icônes 3D (dégradé, reflet, ombre colorée) sur les trois chiffres clés, tuile « Where do inspections
+  fail? » en carte marine en relief, sélecteur Part / Test en contrôle segmenté.
+- **Accueil** : tuiles des pages en relief, panneau marine avec des colonnes 3D isométriques, chiffres clés en
+  pastilles, dernière actualisation.
+Les visuels gardent leur rendu Power BI (Segoe UI, graphiques à plat) par-dessus.
+
+`design_r.py` contient la géométrie et les fonds ; `apply_design_r.py` déplace les visuels d'un `.pbix` en design A
+(V14) vers la géométrie Relief et ajuste leur style. Le modèle et les données sont gardés : la sortie est un `.pbix`,
+`out/Plant visual management dashboard Relief.pbix`.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -272,6 +291,17 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
     `bg_a_fails`) :
     ```bash
     PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_overview_figures.py "<Plant visual management dashboard A.pbix>" --range 2026-11-01 2026-12-01
+    ```
+
+11. Design Relief, sur le `.pbix` V14 (design A, après l'étape 10) : rendre ses fonds de page, puis l'appliquer :
+    ```bash
+    python -c "import design_r as R; [open(f'out/bg_r_{p}.html','w').write(R.render_html(p)) for p in R.D.PAGES]"
+    ```
+    ```bash
+    node tools/render_backgrounds.js out/bg_r_home.html out/bg_r_home.png out/bg_r_overview.html out/bg_r_overview.png out/bg_r_chars.html out/bg_r_chars.png out/bg_r_rl.html out/bg_r_rl.png out/bg_r_rl_details.html out/bg_r_rl_details.png out/bg_r_cpk.html out/bg_r_cpk.png out/bg_r_trend.html out/bg_r_trend.png out/bg_r_fails.html out/bg_r_fails.png
+    ```
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python apply_design_r.py "<V14.pbix>"
     ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
