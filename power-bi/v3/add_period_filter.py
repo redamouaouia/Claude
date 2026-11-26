@@ -31,9 +31,9 @@ bt = pm.bt
 T = bt.T
 OUT_NAME = "Quality_Dashboard_V10"
 TITLES = {"Home": "home", "Overview": "overview", "Characteristics": "chars", "Reaction limits": "rl", "Cpk": "cpk",
-          "Reaction limit details": "rl_details", "Trend chart": "trend"}
-OPTIONAL = {"trend"}  # pages added after V10
-BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk", trend="TrendChart")
+          "Reaction limit details": "rl_details", "Trend chart": "trend", "Failure breakdown": "fails"}
+OPTIONAL = {"trend", "fails"}  # pages added after V10
+BG_NAMES = dict(A.BG_NAMES, home="Home", cpk="Cpk", trend="TrendChart", fails="FailureBreakdown")
 # States of the button slicer (ids of its formatting selectors, as in the Power BI base theme)
 HOVER, PRESS, SELECTED = {"id": "interaction:hover"}, {"id": "interaction:press"}, {"id": "selection:selected"}
 ACCENT = "#6FA8E8"  # light blue of the active page marker

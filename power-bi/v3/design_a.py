@@ -72,6 +72,24 @@ def slicer_rect(x, w):
     return (x + 4, FILTER_Y + SLICER_TOP, w - 8, FILTER_H - SLICER_TOP - 2)
 
 
+# Overview (V13): the decomposition tree moves to its own page, "Failure breakdown"; its place takes the three key
+# figures of the client mockup and a tile that opens that page. The icon and the name of a figure are drawn in the
+# background; the figure and the line under it are a card visual (kpi_value_rect).
+_TX, _TY, _TW, _TH = map_rect(*D.PAGES["overview"]["cards"]["decomp"])
+KPI_H, KPI_GAP = 136, 16
+KPI_W = round((_TW - 2 * KPI_GAP) / 3, 1)
+KPIS = [("failed", "doc", "Failed inspections"), ("rate", "pie", "Fail rate"), ("gap", "target", "Gap to target")]
+KPI = {key: (round(_TX + i * (KPI_W + KPI_GAP), 1), _TY, KPI_W, KPI_H) for i, (key, _, _) in enumerate(KPIS)}
+FAILS_TILE = (_TX, round(_TY + KPI_H + KPI_GAP, 1), _TW, round(_TH - KPI_H - KPI_GAP, 1))
+BACK_LINK = (X0, 18, 96, 28)  # "‹ Overview", before the title of a page opened from another page
+
+
+def kpi_value_rect(key):
+    """The card visual of a key figure (value, and the line under it), under the icon and the name."""
+    x, y, w, h = KPI[key]
+    return (round(x + 18, 1), round(y + 40, 1), round(w - 30, 1), h - 48)
+
+
 # --------------------------------------------------------------------------- artwork
 def arcs(cx, cy, radii, a0, a1, color, opacity=0.35, dots=True, width=1.1):
     """Concentric arcs of the templates (degrees, 0 = right, counter-clockwise), with small dots."""
@@ -119,7 +137,35 @@ body {{ position: relative; font-family: Inter, "Segoe UI", sans-serif; color: {
           text-transform: uppercase; color: {MUTED2}; white-space: nowrap; }}
 .plate {{ position: absolute; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px {LINE},
           0 1px 2px rgba(14,52,114,.04); }}
+.kpi {{ position: absolute; display: flex; align-items: center; gap: 8px; font-size: 9.5px; font-weight: 600;
+        letter-spacing: .07em; text-transform: uppercase; color: {NAVY}; }}
+.open {{ position: absolute; display: flex; align-items: center; gap: 16px; padding: 0 24px 0 22px; }}
+.open .ic {{ width: 44px; height: 44px; border-radius: 12px; background: {NAVY}; display: grid; place-items: center;
+             flex: none; }}
+.open b {{ display: block; font: 600 15px Outfit, "Segoe UI", sans-serif; color: {NAVY}; }}
+.open span {{ display: block; max-width: 410px; margin-top: 4px; font-size: 10.5px; line-height: 1.45; color: {MUTED}; }}
+.open em {{ margin-left: auto; padding: 9px 16px; border-radius: 17px; background: {NAVY}; color: #fff;
+            font: 600 11px Inter, "Segoe UI", sans-serif; font-style: normal; white-space: nowrap; }}
+.back {{ position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 14px;
+         box-shadow: inset 0 0 0 1.2px {NAVY}; font-size: 11px; font-weight: 600; color: {NAVY}; }}
 """
+
+
+def overview_figures():
+    """Plates of the three key figures (icon and name) and the tile that opens "Failure breakdown"."""
+    out = ""
+    for key, icon_name, label in KPIS:
+        x, y, w, h = KPI[key]
+        out += (f'<div class="plate" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px"></div>'
+                f'<div class="kpi" style="left:{x + 18}px;top:{y + 16}px;height:18px">'
+                f'{D.icon(icon_name, 17, BLUE if key == "rate" else NAVY, 1.7)}<span>{html.escape(label)}</span></div>')
+    x, y, w, h = FAILS_TILE
+    return out + (
+        f'<div class="plate" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px"></div>'
+        f'<div class="open" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
+        f'<div class="ic">{D.icon("tree", 22, "#FFFFFF", 1.6)}</div>'
+        f'<div><b>Where do inspections fail?</b><span>Failed inspections by part › test › inspection reason, on a page '
+        f'of their own with the filters of Overview.</span></div><em>Open the breakdown&nbsp; ›</em></div>')
 
 
 def page_html(page):
@@ -137,8 +183,17 @@ def page_html(page):
             f'<div class="rule" style="top:{REFRESH[1] - 6}px"></div>')
     header = (f'<svg class="abs" style="left:{RAIL}px;top:0" width="{W - RAIL}" height="{HEAD_H}">'
               f'{arcs(W - RAIL - 70, HEAD_H, [24, 38, 52, 66, 80, 94, 108], 0, 180, "#9AA8C0", .55, True, .9)}</svg>'
-              f'<div class="t1">{html.escape(spec["title"])}</div><div class="q">{html.escape(spec["question"])}</div>'
               f'<div class="hair"></div>')
+    if spec.get("back"):  # page opened from another page: "‹ <page>" before the title
+        bx, by, bw, bh = BACK_LINK
+        back = dict((k, label) for label, k in D.NAV)[spec["back"]]
+        shift = f' style="left:{bx + bw + 14}px"'
+        header += (f'<div class="back" style="left:{bx}px;top:{by}px;width:{bw}px;height:{bh}px">'
+                   f'‹&nbsp; {html.escape(back)}</div>')
+        header += (f'<div class="t1"{shift}>{html.escape(spec["title"])}</div>'
+                   f'<div class="q" style="left:{bx + bw + 16}px">{html.escape(spec["question"])}</div>')
+    else:
+        header += f'<div class="t1">{html.escape(spec["title"])}</div><div class="q">{html.escape(spec["question"])}</div>'
     if page in D.PERIOD_PAGES:
         px, py, pw, ph = PERIOD
         header += f'<div class="track" style="left:{px}px;top:{py}px;width:{pw}px;height:{ph}px"></div>'
@@ -151,8 +206,11 @@ def page_html(page):
         x, y, w, h = CONTEXT
         boxes += (f'<div class="box" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
                   f'<b>{html.escape(spec["context"])}</b></div>')
+    cards = {k: r for k, r in spec["cards"].items() if not (page == "overview" and k == "decomp")}
     plates = "".join(f'<div class="plate" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px"></div>'
-                     for x, y, w, h in (map_rect(*r) for r in spec["cards"].values()))
+                     for x, y, w, h in (map_rect(*r) for r in cards.values()))
+    if page == "overview":
+        plates += overview_figures()
     return (f'<!doctype html><html><head><meta charset="utf-8">{FONTS}<style>{CSS}</style></head><body>'
             f'{header}{boxes}{plates}{rail}</body></html>')
 

@@ -192,6 +192,21 @@ Le design choisi parmi les trois propositions tirées des modèles de l'entrepri
 enregistré par Power BI Desktop. Le modèle, les données, les mesures, les filtres, les signets et les autres réglages
 des visuels sont gardés : la sortie est un `.pbix`, `out/Plant visual management dashboard A.pbix`.
 
+## V13 : chiffres clés sur Overview, page « Failure breakdown »
+
+Retours client sur Overview (design A) :
+- **Trois chiffres clés**, comme la maquette du client : *Failed inspections* (période choisie), *Fail rate* (part des
+  inspections) et *Gap to target* (taux de réussite moins la cible de 95 %, en points : orange sous la cible, bleu à
+  partir de la cible). L'icône et le nom sont dessinés dans le fond de page ; le chiffre et la ligne en dessous sont
+  des cartes (nouveau visuel carte), dont la ligne est le nom du champ dans le visuel.
+- **« Where do inspections fail? »** (arbre de décomposition) n'est plus affiché sur Overview : une tuile l'ouvre sur
+  sa propre page, **Failure breakdown**, masquée dans les onglets. Cette page a les filtres d'Overview (copies des
+  segments, mêmes groupes de synchronisation, panneau *More filters* et ses signets) et « ‹ Overview » pour revenir.
+
+Le modèle reçoit deux mesures (`overview_model.py`) : `Pass % Gap` (format `+0.0 pp`) et `Pass % Gap Color`. La
+sortie est donc un modèle `.pbit` : `out/Plant visual management dashboard V13.pbit` (données rechargées à l'ouverture).
+`add_overview_figures.py` part du `.pbix` du design A.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -242,16 +257,22 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
    ```
 
 9. Design A (modèles OPmobility), après l'étape 0 : rendre ses fonds de page, puis l'appliquer au `.pbix` du
-   rapport (modèle et données gardés) :
+   rapport (modèle et données gardés). Le fond d'Overview a déjà la mise en page V13 : enchaîner avec l'étape 10.
    ```bash
    python -c "import design_a as A; [open(f'out/bg_a_{p}.html','w').write(A.render_html(p)) for p in A.D.PAGES]"
    ```
    ```bash
-   node tools/render_backgrounds.js out/bg_a_home.html out/bg_a_home.png out/bg_a_overview.html out/bg_a_overview.png out/bg_a_chars.html out/bg_a_chars.png out/bg_a_rl.html out/bg_a_rl.png out/bg_a_cpk.html out/bg_a_cpk.png out/bg_a_rl_details.html out/bg_a_rl_details.png out/bg_a_trend.html out/bg_a_trend.png
+   node tools/render_backgrounds.js out/bg_a_home.html out/bg_a_home.png out/bg_a_overview.html out/bg_a_overview.png out/bg_a_chars.html out/bg_a_chars.png out/bg_a_rl.html out/bg_a_rl.png out/bg_a_cpk.html out/bg_a_cpk.png out/bg_a_rl_details.html out/bg_a_rl_details.png out/bg_a_trend.html out/bg_a_trend.png out/bg_a_fails.html out/bg_a_fails.png
    ```
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python apply_design_a.py "<Plant visual management dashboard.pbix>"
    ```
+
+10. Chiffres clés d'Overview et page « Failure breakdown » (V13), après l'étape 9 (fonds `bg_a_*` rendus, dont
+    `bg_a_fails`) :
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_overview_figures.py "<Plant visual management dashboard A.pbix>" --range 2026-11-01 2026-12-01
+    ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
 (`@microsoft/powerbi-core-visual-schema`). Il vérifie aussi que chaque visuel ciblé par un signet existe toujours.

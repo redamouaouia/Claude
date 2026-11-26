@@ -32,7 +32,7 @@ BADGE = (20, 16, 56, 56)  # company symbol at the top of the rail: the Home butt
 CLEAR_TILE = (10, 636, 76, 64)
 REFRESH_PILL = (966, 22, 290, 26)
 PERIOD_TRACK = (966, 54, 290, 26)  # period filter (Day, WTD, MTD, YTD, Year), under the refresh time
-PERIOD_PAGES = ("overview", "chars", "rl", "cpk", "trend")
+PERIOD_PAGES = ("overview", "chars", "rl", "cpk", "trend", "fails")
 DATE_W, MORE_W = 250, 132  # fixed widths: two date boxes, and the full "More filters · N" label
 
 
@@ -138,6 +138,17 @@ PAGES["trend"] = {
         "chart": (X0, ROW2_Y + TREND_KPI_H + GAP, X1 - X0, H - 16 - (ROW2_Y + TREND_KPI_H + GAP)),
     },
 }
+PAGES["fails"] = {
+    # Opened from the "Where do inspections fail?" tile of Overview (V13): the decomposition tree of the failed
+    # inspections on its own page, with the filters of Overview (same sync groups). Not in the page tabs.
+    "title": "Failure breakdown",
+    "question": "Which parts, tests and inspection reasons fail?",
+    "nav": "overview",
+    "back": "overview",
+    "slicers": PAGES["overview"]["slicers"],
+    "more_count": 2,
+    "cards": {"decomp": (X0, ROW2_Y, X1 - X0, H - 16 - ROW2_Y)},
+}
 PAGES["home"] = {
     # Home page: concept B of the proposals. Hero on the left, the pages on the right, a reading guide below.
     "title": REPORT_TITLE,
@@ -188,6 +199,14 @@ ICONS = {
     "glyph": '<path d="M3 6.5h18M3 17.5h18" stroke-dasharray="2.2 2.2"/>'
              '<path d="M3 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0 2.4 2.6 3.6 1.4"/>',
     "clock": '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+    # key figures of Overview (V13) and the tile of the decomposition tree
+    "doc": '<path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5z"/>'
+           '<path d="M14 3.5v4h4M9 12h6M9 15.5h4.5"/>',
+    "pie": '<path d="M10.5 5a8 8 0 1 0 8.5 8.5h-8.5z"/><path d="M13.5 2.5A8 8 0 0 1 21.5 10.5h-8z" fill="currentColor"/>',
+    "target": '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.8"/>'
+              '<circle cx="12" cy="12" r="1.3" fill="currentColor"/>',
+    "tree": '<circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="12" r="2"/>'
+            '<circle cx="19" cy="19" r="2"/><path d="M7 12h10M7 12c5 0 5-7 10-7M7 12c5 0 5 7 10 7"/>',
     "trend": '<path d="M2.5 5.5h19M2.5 18.5h19" stroke-dasharray="2.2 2.2"/>'
              '<path d="M3 13.5l3.2-3.5 3 3.2 3.4-5.2 3.2 6 3-3.4 2.7 1.4"/>',
 }
@@ -195,7 +214,7 @@ ICONS = {
 
 def icon(name, size, color, sw=1.6):
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
-            f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">{ICONS[name]}</svg>')
+            f'style="color:{color}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round">{ICONS[name]}</svg>')
 
 
 def tolerance_motif(fade=True):

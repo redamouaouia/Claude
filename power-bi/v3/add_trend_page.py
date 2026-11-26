@@ -236,7 +236,7 @@ def main():
         if title not in PF.TITLES:
             sys.exit(f"unexpected page '{title}'")
         keys[PF.TITLES[title]] = pid
-    required = set(PF.TITLES.values()) - {"trend"}
+    required = set(PF.TITLES.values()) - PF.OPTIONAL
     if required - set(keys):
         sys.exit(f"pages missing: {sorted(required - set(keys))}")
     keys["trend"] = A.new_name()
