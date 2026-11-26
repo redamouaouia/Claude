@@ -426,11 +426,11 @@ HOME_CSS = f"""
 
 HOME_PAGES = {  # page key: (question, highlights)
     "overview": ("How many inspections pass, and where do they fail?",
-                 "Pass % vs the 95 % target · Pass & Fail by part and by test · where inspections fail"),
+                 "Pass % vs the 95 % target · failed inspections · results by part and by test · failure breakdown"),
     "chars": ("How do measured values evolve, and which characteristics fail?",
-              "Values per day · Pass & Fail % by part and by test · results per characteristic"),
+              "Cumulative Pass & Fail · Pass & Fail % by part and by test · results per characteristic"),
     "rl": ("Where are measurements getting close to the limit?",
-           "Violations per day · top 15 characteristics · details: value, limits, tolerance"),
+           "Cumulative violations · top 15 characteristics · details: value, limits, tolerance"),
     "cpk": ("Which parts, tests and characteristics are capable?",
             "Cpk pass % · Cpk by part and by test · Cpk of each characteristic"),
     "trend": ("How do the measured values and Cpk evolve over time?",
