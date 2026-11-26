@@ -226,6 +226,27 @@ Les visuels gardent leur rendu Power BI (Segoe UI, graphiques à plat) par-dessu
 (V14) vers la géométrie Relief et ajuste leur style. Le modèle et les données sont gardés : la sortie est un `.pbix`,
 `out/Plant visual management dashboard Relief.pbix`.
 
+## V15 : le cumul partout, tous les filtres sur toutes les pages
+
+Demande client : chaque visuel montre le cumul de la sélection, aucun visuel ne se limite à une période, chaque filtre
+s'applique partout.
+- Aucun visuel n'avait de filtre de période propre (vérifié : filtres de visuel, de page et de rapport, interactions,
+  mesures à fenêtre fixe). Les chiffres clés, jauges, tableaux, barres et le Cpk étaient déjà des totaux de la
+  sélection.
+- **Graphiques dans le temps en cumul** (`cumul_model.py`) : à chaque point, le total depuis le début de la période
+  choisie (et des dates, et des autres filtres) jusqu'à ce point. Overview : *Cumulative pass %* par mois ;
+  Characteristics : *Pass & Fail · cumulative* par jour, et les deux cartes à courbe (le chiffre reste le total de la
+  période, la courbe devient cumulée) ; Reaction limits : violations cumulées par jour. Le Trend chart reste la suite
+  des valeurs mesurées de la période (un cumul de valeurs mesurées n'aurait pas de sens) ; son Cpk est celui de toute
+  la période.
+- **Tous les filtres sur toutes les pages d'analyse**, pages de détail comprises (Plant, Part, Test, Characteristic,
+  Inspection reason, Date, Period, KPC, Press, Cpk threshold, Cpk status) : là où une page ne montre pas un filtre,
+  une copie masquée du segment (même groupe de synchronisation) applique la sélection faite ailleurs. Cpk threshold et
+  Cpk status reçoivent un groupe de synchronisation. La page d'accueil n'est pas filtrée.
+
+`add_cumulative.py` part du `.pbix` Relief ; le modèle reçoit six mesures cumulées, la sortie est donc un modèle
+`.pbit` : `out/Plant visual management dashboard V15.pbit`.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -302,6 +323,11 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
     ```
     ```bash
     PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python apply_design_r.py "<V14.pbix>"
+    ```
+
+12. Le cumul partout et tous les filtres sur toutes les pages (V15), sur le `.pbix` Relief :
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_cumulative.py "<Relief.pbix>" --range 2026-11-01 2026-12-01
     ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
