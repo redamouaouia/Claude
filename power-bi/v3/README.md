@@ -247,6 +247,17 @@ s'applique partout.
 `add_cumulative.py` part du `.pbix` Relief ; le modèle reçoit six mesures cumulées, la sortie est donc un modèle
 `.pbit` : `out/Plant visual management dashboard V15.pbit`.
 
+## V16 : page d'accueil, tuiles avec aperçu et pièce contrôlée
+
+- **Tuiles de navigation** dans le style demandé : aperçu miniature de la page, numéro, nom, question, contenu de la
+  page en une ligne, bouton rond marine en relief.
+- **Panneau marine** : un véhicule et ses points de mesure (jeu et affleurement, ajustement du bouclier et du hayon,
+  épaisseur de peinture, un point hors tolérance), choisi parmi quatre images (carte de contrôle, capabilité, usine
+  connectée, pièce contrôlée : `design_r.ARTS`, choix dans `design_r.HOME_ART`).
+
+`update_home_r.py` replace les boutons des tuiles et remplace le fond de la page d'accueil d'un rapport Relief
+(`.pbix` ou `.pbit`) ; le reste est gardé. Sortie : `out/Plant visual management dashboard V16.pbit` depuis la V15.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -328,6 +339,17 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
 12. Le cumul partout et tous les filtres sur toutes les pages (V15), sur le `.pbix` Relief :
     ```bash
     PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python add_cumulative.py "<Relief.pbix>" --range 2026-11-01 2026-12-01
+    ```
+
+13. Page d'accueil Relief (V16), sur un rapport Relief (`.pbix` ou `.pbit`) :
+    ```bash
+    python -c "import design_r as R; open('out/bg_r_home.html','w').write(R.render_html('home'))"
+    ```
+    ```bash
+    node tools/render_backgrounds.js out/bg_r_home.html out/bg_r_home.png
+    ```
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_home_r.py "<Plant visual management dashboard V15.pbit>"
     ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI

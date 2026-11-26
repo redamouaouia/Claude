@@ -489,9 +489,9 @@ def art_car():
            + "".join(f'<circle cx="{cx}" cy="150" r="{r}" fill="{f}" stroke="#FFFFFF" stroke-width="{sw}"/>'
                      for x in (110, 360) for cx, r, f, sw in [(x, 24, "#0A2756", 1.8), (x, 10, "rgba(255,255,255,.25)", 1)])
            + '</g>')
-    points = [(430, 128, "ok", "Bumper fit", 352, 196), (318, 92, "ok", "Gap & flush", 290, 6),
-              (240, 112, "fail", "Door gap", 196, 196), (58, 104, "ok", "Tailgate fit", 6, 6),
-              (96, 84, "ok", "Paint thickness", 30, 196)]
+    points = [(430, 128, "ok", "Bumper fit", 352, 212), (318, 92, "ok", "Gap & flush", 290, 6),
+              (240, 112, "fail", "Door gap", 196, 212), (58, 104, "ok", "Tailgate fit", 6, 6),
+              (96, 84, "ok", "Paint thickness", 30, 212)]
     for x, y, state, label, tx, ty in points:
         c = "#8EC5FF" if state == "ok" else "#FFA45C"
         y += 30  # the car is drawn 30 px lower (room for the chips above)
@@ -506,7 +506,7 @@ def art_car():
 
 
 ARTS = {"columns": art_columns, "spc": art_spc, "capability": art_capability, "plant": art_plant, "car": art_car}
-HOME_ART = "columns"  # illustration of the navy panel of the home page
+HOME_ART = "car"  # illustration of the navy panel of the home page (chosen: car with measured points)
 
 
 def home_html(art=None):
