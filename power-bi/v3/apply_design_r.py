@@ -166,6 +166,77 @@ def redesign_page(defs, pid, key, page_keys):
     return moved
 
 
+def _measure(v):
+    q = v["visual"].get("query", {}).get("queryState", {}).get("Data", {}).get("projections", [])
+    return q[0]["field"].get("Measure", {}).get("Property") if q else None
+
+
+def arrange_overview(defs, pid, page_keys):
+    """V17: the four key figures in the first row; the cumulative pass % and the failure tile below on the left, the
+    gauge (titled, with the period) and the results table (with its Part / Test switch) on the right."""
+    vis = [v for k, v in defs.items() if k.startswith(f"pages/{pid}/visuals/") and not AD.is_panel(v)]
+    cards = {_measure(v): v for v in vis if v["visual"]["visualType"] == "cardVisual"}
+    for key, measure in (("pass", "Inspection Pass %"), ("failed", "Inspections Fail"), ("rate", "Inspection Fail %"),
+                         ("gap", "Pass % Gap")):
+        if measure not in cards:
+            sys.exit(f"Overview: no card of [{measure}]")
+        A.place(cards[measure], *DR.kpi_value_rect(key))
+    hero = cards["Inspection Pass %"]  # Pass rate, as the three other figures: value, and its line under it
+    hero["visual"]["objects"]["label"] = [SEL({"show": B(True), "position": S("belowValue"), "fontColor": C(R.MUTED2),
+                                               "fontSize": N(9.5), "fontFamily": S("Segoe UI"),
+                                               "horizontalAlignment": S("left")}, R.DEFAULT)]
+    proj = hero["visual"]["query"]["queryState"]["Data"]["projections"][0]
+    proj["displayName"] = proj["nativeQueryRef"] = "Share of inspections passed"
+    hero["visual"]["visualContainerObjects"] = R.vco_plain()
+    one = {t: [v for v in vis if v["visual"]["visualType"] == t] for t in ("gauge", "lineChart")}
+    for t, rect in (("gauge", DR.OV_GAUGE), ("lineChart", DR.OV_LINE)):
+        if len(one[t]) != 1:
+            sys.exit(f"Overview: {len(one[t])} {t} (one expected)")
+        A.place(one[t][0], *rect)
+    gauge = one["gauge"][0]
+    vco = R.vco_card("Pass rate vs 95 % target", " ", bg=False, pad=(12, 4, 16, 16), header=False)
+    A.dynamic_subtitle(vco, "Period Label")
+    gauge["visual"]["visualContainerObjects"] = vco
+    for v in vis:
+        link = R.link_of(v)
+        if v["visual"]["visualType"] == "tableEx":
+            A.place(v, *DR.OV_TABLE)
+        elif link.get("type") == "PageNavigation" and page_keys.get(link.get("navigationSection")) == "fails":
+            A.place(v, *DR.OV_TILE)
+    # Part / Test switch: its textboxes and their bookmark buttons, left (Part) and right (Test)
+    boxes = [v["position"] for v in vis if toggle_side(v)]
+    switch = [v for v in vis if v["visual"]["visualType"] in ("textbox", "actionButton") and any(
+        abs(v["position"]["x"] - q["x"]) < 1 and abs(v["position"]["y"] - q["y"]) < 1 for q in boxes)]
+    if len(switch) != 8:
+        sys.exit(f"Overview: {len(switch)} visuals for the Part / Test switch (8 expected)")
+    middle = sum(v["position"]["x"] for v in switch) / len(switch)
+    left, right = DR.toggle_rects()
+    for v in switch:
+        A.place(v, *(left if v["position"]["x"] < middle else right))
+
+
+def place_filter_row(defs, pid, key):
+    """V17: slicers, More filters / Back and the details card into the taller wells of the filter row."""
+    slots = DR.slicer_slots(key) if D.PAGES[key]["slicers"] else []
+    n = 0
+    for v in [v for k, v in defs.items() if k.startswith(f"pages/{pid}/visuals/")]:
+        p, vt = v["position"], v["visual"]["visualType"]
+        if v.get("isHidden") or p["x"] < DR.X0 - 4 or not 70 <= p["y"] < 140:
+            continue
+        if vt == "slicer":
+            i = AD.nearest(p["x"], [x for x, _ in slots[:-1]])
+            A.place(v, *DR.slicer_rect(*slots[i]))
+        elif vt == "actionButton" and p["x"] >= DR.X1 - DR.MORE_W - 2:
+            A.place(v, *((slots[-1][0], DR.FILTER_Y, slots[-1][1], DR.FILTER_H) if slots else DR.BACK))
+        elif vt == "card" and key == "rl_details":
+            x, y, w, h = DR.CONTEXT
+            A.place(v, *DR.slicer_rect(x, w))
+        else:
+            continue
+        n += 1
+    return n
+
+
 def redesign_home(defs, pid, page_keys):
     """Home visuals onto the Relief home: page tiles, key-figure chips, last refresh."""
     n = 0
@@ -221,6 +292,7 @@ def main(src_path, dst):
     for key, pid in keys.items():
         if key != "home":
             print(f"{key:11s}", redesign_page(defs, pid, key, page_keys))
+    arrange_overview(defs, keys["overview"], page_keys)
     print(f"{'home':11s} {redesign_home(defs, keys['home'], page_keys)} visuals moved")
     images, old = set_backgrounds(defs, keys)
 

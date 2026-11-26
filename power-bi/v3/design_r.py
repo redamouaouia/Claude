@@ -25,8 +25,8 @@ CANVAS = "#E9EEF4"
 RAIL_BOX = (14, 14, 152, 692)  # floating navy rail
 X0, X1 = 186, 1264
 CONTENT_Y0, CONTENT_Y1 = 142, 706
-FILTER_Y, FILTER_H = 84, 44
-SLICER_TOP = 16  # the slicer visual sits under the name written in its well
+FILTER_Y, FILTER_H = 78, 54  # V17: taller wells, so that the date range shows its two dates
+SLICER_TOP = 16  # the slicer visual (36 px high) sits under the name written in its well
 PERIOD = (964, 22, 300, 36)  # inset track; the button slicer inside, 3 px in
 NAV = {key: (26, 118 + i * 46, 128, 38) for i, (_, key) in enumerate(D.NAV)}
 HOME_LINK = (26, 28, 128, 74)  # logo and "‹ Home"
@@ -78,18 +78,42 @@ def slicer_rect(x, w):
     return (x + 5, FILTER_Y + SLICER_TOP, w - 10, FILTER_H - SLICER_TOP - 3)
 
 
+# Overview (V17): the four key figures in the first row; below, the cumulative pass % and the failure tile on the
+# left, the gauge and the results table on the right.
+GAP = 16
+KPIS = [("pass", "gauge", "Pass rate"), ("failed", "doc", "Failed inspections"), ("rate", "pie", "Fail rate"),
+        ("gap", "target", "Gap to target")]
+KPI_W, KPI_H = round((X1 - X0 - 3 * GAP) / 4, 1), 120
+KPI = {key: (round(X0 + i * (KPI_W + GAP), 1), CONTENT_Y0, KPI_W, KPI_H) for i, (key, _, _) in enumerate(KPIS)}
+_ROW2 = CONTENT_Y0 + KPI_H + GAP
+_RIGHT_W = 338
+_LEFT_W = X1 - X0 - GAP - _RIGHT_W
+OV_LINE = (X0, _ROW2, _LEFT_W, 274)
+OV_TILE = (X0, _ROW2 + 274 + GAP, _LEFT_W, CONTENT_Y1 - (_ROW2 + 274 + GAP))
+OV_GAUGE = (X0 + _LEFT_W + GAP, _ROW2, _RIGHT_W, 150)
+OV_TABLE = (X0 + _LEFT_W + GAP, _ROW2 + 150 + GAP, _RIGHT_W, CONTENT_Y1 - (_ROW2 + 150 + GAP))
+# Part / Test switch of "Results per part": two buttons of 49.5 x 24.7 at the top right of the table
+TOGGLE = (49.5, 24.7, 2, 106.7, 13.4)  # width, height, gap, from the right edge of the table, from its top
+
+
+def kpi_value_rect(key):
+    """The card visual of a key figure (value, and the line under it), under the icon and the name."""
+    x, y, w, h = KPI[key]
+    return (round(x + 18, 1), y + 38, round(w - 30, 1), h - 44)
+
+
+def toggle_rects():
+    tw, th, gap, right, top = TOGGLE
+    x, y, w, h = OV_TABLE
+    first = round(x + w - right, 1)
+    return [(first, y + top, tw, th), (round(first + tw + gap, 1), y + top, tw, th)]
+
+
 def cards(page):
     """The white cards of a page, in Relief geometry."""
-    spec = D.PAGES[page]
-    out = [map_rect(*DA.map_rect(*r)) for k, r in spec["cards"].items() if not (page == "overview" and k == "decomp")]
     if page == "overview":
-        out += [map_rect(*DA.KPI[k]) for k, _, _ in DA.KPIS]
-    return out
-
-
-# Overview: the Part / Test switch of "Results per part" (two textboxes in design A, at the right of the table title)
-TOGGLES_A = (1145.7, 427.3, 2 * 49.3 + 2, 25.1)
-TOGGLE_TRACK = tuple(round(v, 1) for v in (lambda r: (r[0] - 3, r[1] - 3, r[2] + 6, r[3] + 6))(map_rect(*TOGGLES_A)))
+        return [KPI[k] for k, _, _ in KPIS] + [OV_LINE, OV_GAUGE, OV_TABLE]
+    return [map_rect(*DA.map_rect(*r)) for r in D.PAGES[page]["cards"].values()]
 
 
 # --------------------------------------------------------------------------- artwork
@@ -191,6 +215,8 @@ body {{ position: relative; font-family: Inter, "Segoe UI", sans-serif; color: {
 .pebble svg {{ position: relative; }}
 .pebble i {{ position: absolute; inset: 0; background: radial-gradient(circle at 30% 18%, rgba(255,255,255,.55),
              rgba(255,255,255,0) 58%); }}
+.pebble.blue {{ background: linear-gradient(160deg, #6FAEF2 0%, #2F6EBA 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -3px 6px rgba(0,0,0,.2), 0 9px 16px -7px rgba(47,110,186,.85); }}
 .pebble.navy {{ background: linear-gradient(160deg, #3F7BD0 0%, #0E3472 100%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.5), inset 0 -3px 6px rgba(0,0,0,.25), 0 9px 16px -7px rgba(14,52,114,.85); }}
 .pebble.orange {{ background: linear-gradient(160deg, #FFAE66 0%, #E2651B 100%);
@@ -234,19 +260,20 @@ def rail_html(active):
 def overview_artwork():
     """Icons and names of the key figures, the failure tile, the track of the Part / Test switch."""
     out = ""
-    for key, icon_name, label in DA.KPIS:
-        x, y, w, h = map_rect(*DA.KPI[key])
-        kind = {"failed": "navy", "rate": "orange", "gap": "amber"}[key]
+    for key, icon_name, label in KPIS:
+        x, y, w, h = KPI[key]
+        kind = {"pass": "blue", "failed": "navy", "rate": "orange", "gap": "amber"}[key]
         out += (f'<div class="kpi" style="left:{x + 18}px;top:{y + 13}px">{pebble(kind, icon_name, 30, 15)}'
                 f'<span>{html.escape(label)}</span></div>')
-    x, y, w, h = map_rect(*DA.FAILS_TILE)
+    x, y, w, h = OV_TILE
     out += (f'<div class="cta" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
             f'<svg class="abs" style="left:0;top:0" width="{w}" height="{h}">'
             f'{arcs(w - 40, h + 30, [60, 84, 108, 132, 156, 180], 0, 180, "#FFFFFF", .5, 1)}</svg>'
             f'<div class="cta-in">{pebble("glass", "tree", 48, 24)}<div><b>Where do inspections fail?</b>'
             f'<span>Failed inspections by part › test › inspection reason, on a page of their own with the filters of '
             f'Overview.</span></div><em>Open the breakdown&nbsp; ›</em></div></div>')
-    tx, ty, tw, th = TOGGLE_TRACK
+    (ax, ay, aw, ah), (bx, _, bw, _) = toggle_rects()
+    tx, ty, tw, th = ax - 3, ay - 3, bx + bw - ax + 6, ah + 6
     out += (f'<div class="well" style="left:{tx}px;top:{ty}px;width:{tw}px;height:{th}px;border-radius:11px;'
             f'box-shadow:inset 0 1px 3px rgba(16,40,80,.14), inset 0 -1px 0 rgba(255,255,255,.95)"></div>')
     return out

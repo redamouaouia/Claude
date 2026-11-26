@@ -258,6 +258,18 @@ s'applique partout.
 `update_home_r.py` replace les boutons des tuiles et remplace le fond de la page d'accueil d'un rapport Relief
 (`.pbix` ou `.pbit`) ; le reste est gardé. Sortie : `out/Plant visual management dashboard V16.pbit` depuis la V15.
 
+## V17 : Overview avec les chiffres clés en haut, filtres centrés
+
+- **Overview** : *Pass rate*, *Failed inspections*, *Fail rate* et *Gap to target* forment la première rangée (même
+  style : icône 3D, nom, chiffre, ligne sous le chiffre). En dessous : *Cumulative pass %* et la tuile « Where do
+  inspections fail? » à gauche ; la jauge (titrée *Pass rate vs 95 % target*, avec la période choisie) et le tableau
+  des résultats avec son sélecteur Part / Test à droite.
+- **Rangée des filtres** (toutes les pages) : champs plus hauts (54 px), segments de 36 px sous leur nom. La valeur des
+  listes est centrée et le filtre de dates montre ses deux dates (à 25 px de haut, Power BI n'affichait qu'une icône).
+
+`update_layout_r.py` applique ces deux changements à un rapport Relief (`.pbix` ou `.pbit`, modèle et données gardés)
+après le rendu des fonds Relief (étape 11) : `out/Plant visual management dashboard V17.pbix`.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -350,6 +362,12 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
     ```
     ```bash
     PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_home_r.py "<Plant visual management dashboard V15.pbit>"
+    ```
+
+14. Overview avec les chiffres clés en haut et filtres centrés (V17), sur un rapport Relief, après le rendu des fonds
+    Relief (étape 11) :
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_layout_r.py "<V16.pbix>"
     ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI

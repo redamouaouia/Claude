@@ -200,6 +200,7 @@ ICONS = {
              '<path d="M3 12c1.6-3.4 3.2-3.4 4.8 0s3.2 3.4 4.8 0 3.2-3.4 4.8 0 2.4 2.6 3.6 1.4"/>',
     "clock": '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
     # key figures of Overview (V13) and the tile of the decomposition tree
+    "gauge": '<path d="M4 16.5a8 8 0 0 1 16 0"/><path d="M12 16.5l4.2-5.2"/><circle cx="12" cy="16.5" r="1.4" fill="currentColor"/>',
     "doc": '<path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5z"/>'
            '<path d="M14 3.5v4h4M9 12h6M9 15.5h4.5"/>',
     "pie": '<path d="M10.5 5a8 8 0 1 0 8.5 8.5h-8.5z"/><path d="M13.5 2.5A8 8 0 0 1 21.5 10.5h-8z" fill="currentColor"/>',
