@@ -1,11 +1,12 @@
-"""White versions of the company logo for the dark page backgrounds of Quality Dashboard V3.
+"""White and navy versions of the company logo for the page backgrounds of Quality Dashboard V3.
 
 Usage:  python make_logo_assets.py <logo.png>
 
 <logo.png>: the logo in its usual colours, dark ink on a light or transparent background. Writes, in
 out/brand/ (git-ignored, the logo is not stored in this repository):
 - symbol_white.png: the symbol alone (the largest shape on the left of the logo), white, for the rail tile;
-- logo_white.png: the whole logo, white, for the header.
+- logo_white.png: the whole logo, white, for the header (and the navy rail and panel of design A);
+- logo_navy.png: the whole logo, navy, for the white home page of design A.
 The shapes are only recoloured, never redrawn: anti-aliased edges become transparency.
 """
 import pathlib
@@ -17,6 +18,7 @@ from PIL import Image
 
 HERE = pathlib.Path(__file__).resolve().parent
 OUT = HERE / "out" / "brand"
+WHITE, NAVY = (255, 255, 255), (14, 52, 114)  # navy #0E3472 of the templates
 
 
 def coverage(img):
@@ -53,13 +55,13 @@ def components(mask):
     return lab, out
 
 
-def white(cov, keep, box, pad=4):
+def recolour(cov, keep, box, rgb, pad=4):
     x0, y0, x1, y1 = box
     h, w = cov.shape
     x0, y0, x1, y1 = max(0, x0 - pad), max(0, y0 - pad), min(w, x1 + pad + 1), min(h, y1 + pad + 1)
     alpha = (cov * keep)[y0:y1, x0:x1]
     out = np.zeros(alpha.shape + (4,), np.uint8)
-    out[..., :3] = 255
+    out[..., :3] = rgb
     out[..., 3] = np.round(alpha * 255).astype(np.uint8)
     return Image.fromarray(out, "RGBA")
 
@@ -81,9 +83,10 @@ def main(src):
     others = (lab > 0) & (lab != symbol[0])
     keep &= ~others
     OUT.mkdir(parents=True, exist_ok=True)
-    white(cov, keep, symbol[1:5]).save(OUT / "symbol_white.png")
+    recolour(cov, keep, symbol[1:5], WHITE).save(OUT / "symbol_white.png")
     box = (min(c[1] for c in comps), min(c[2] for c in comps), max(c[3] for c in comps), max(c[4] for c in comps))
-    white(cov, np.ones_like(cov), box).save(OUT / "logo_white.png")
+    recolour(cov, np.ones_like(cov), box, WHITE).save(OUT / "logo_white.png")
+    recolour(cov, np.ones_like(cov), box, NAVY).save(OUT / "logo_navy.png")
     print(f"{len(comps)} shapes; symbol {symbol[3] - symbol[1] + 1}x{symbol[4] - symbol[2] + 1} px, "
           f"logo {box[2] - box[0] + 1}x{box[3] - box[1] + 1} px -> {OUT}")
 

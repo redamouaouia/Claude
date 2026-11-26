@@ -172,16 +172,36 @@ dans la ligne du haut de chaque page et, sur trois lignes, sur la page d'accueil
 `update_home_page.py` reconstruit les visuels de la page d'accueil et remplace les fonds de page dans un `.pbix`. Le
 modèle, les données et les autres pages sont gardés : la sortie est un `.pbix`, `out/Quality_Dashboard_V12.pbix`.
 
+## Design A « Rail marine » (modèles OPmobility)
+
+Le design choisi parmi les trois propositions tirées des modèles de l'entreprise (bleu marine #0E3472, gris clair
+#F4F6F8, arcs concentriques, titres en Outfit) :
+- **Rail marine** de 150 px à gauche : logo blanc et « ‹ Home », les cinq pages (la page active dans une pastille
+  blanche), *Clear filters* et la dernière actualisation en bas.
+- **En-tête blanc** : titre et question de la page, arcs des modèles en haut à droite, filtre de période à côté du
+  titre (style clair : la période choisie en bleu clair, contour marine).
+- **Filtres** : chaque segment dans une boîte grise, sous son nom ; *More filters* (ou *Back*) avec un contour marine.
+- **Contenu** : les visuels gardent leur ordre et leurs proportions dans la nouvelle zone de contenu. Les cartes
+  blanches (bord gris clair, coins arrondis) sont dessinées dans le fond de page : les visuels perdent leur propre
+  fond blanc. Le panneau *More filters* ne bouge pas.
+- **Accueil** : à gauche, le logo marine, le titre et une ligne par page ; à droite, le panneau marine des modèles
+  avec le logo blanc, les chiffres clés (en direct pour les sites et les valeurs mesurées) et la dernière
+  actualisation.
+
+`design_a.py` contient la géométrie et les fonds de page du design A ; `apply_design_a.py` l'applique à un `.pbix`
+enregistré par Power BI Desktop. Le modèle, les données, les mesures, les filtres, les signets et les autres réglages
+des visuels sont gardés : la sortie est un `.pbix`, `out/Plant visual management dashboard A.pbix`.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
 complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké dans ce dépôt public :
-`make_logo_assets.py <logo.png>` en crée les versions blanches dans `out/brand/` (ignoré par git), en recolorant
-seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent l'icône et le texte d'origine.
+`make_logo_assets.py <logo.png>` en crée les versions blanches et marine (`logo_navy.png`, accueil du design A) dans
+`out/brand/` (ignoré par git), en recolorant seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent l'icône et le texte d'origine.
 
 ## Régénérer
 
-0. Versions blanches du logo (une fois) :
+0. Versions blanches et marine du logo (une fois) :
    ```bash
    python make_logo_assets.py <logo.png>
    ```
@@ -219,6 +239,18 @@ seulement les formes du logo d'origine. Sans ces fichiers, les fonds reprennent 
 8. Remplacer seulement les fonds de page d'un `.pbix`, sans toucher au modèle, aux données ni aux visuels :
    ```bash
    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_backgrounds.py <V4.pbix>
+   ```
+
+9. Design A (modèles OPmobility), après l'étape 0 : rendre ses fonds de page, puis l'appliquer au `.pbix` du
+   rapport (modèle et données gardés) :
+   ```bash
+   python -c "import design_a as A; [open(f'out/bg_a_{p}.html','w').write(A.render_html(p)) for p in A.D.PAGES]"
+   ```
+   ```bash
+   node tools/render_backgrounds.js out/bg_a_home.html out/bg_a_home.png out/bg_a_overview.html out/bg_a_overview.png out/bg_a_chars.html out/bg_a_chars.png out/bg_a_rl.html out/bg_a_rl.png out/bg_a_cpk.html out/bg_a_cpk.png out/bg_a_rl_details.html out/bg_a_rl_details.png out/bg_a_trend.html out/bg_a_trend.png
+   ```
+   ```bash
+   PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python apply_design_a.py "<Plant visual management dashboard.pbix>"
    ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
