@@ -55,11 +55,14 @@ LATEST_SQL = [
 ]
 SQL_LINES = [
     *LATEST_SQL,
-    "  SELECT",  # the 21 columns read from the table (out of 65), and the values derived from them
+    "  SELECT",  # the 22 columns read from the table (out of 65), and the values derived from them
     "    plant, posting_date, process, characteristic, characteristic_status, process_status,",
     "    key_order_inspection_plan_index_plant, process_id, date_time, bmm_machine, kpc, key_kpc,",
-    "    characteristic_result, characteristic_value_num, limit_min_alert, limit_max_alert,",
-    "    lsl_inspection_plan, usl_inspection_plan,",
+    "    characteristic_result, characteristic_value_num, lsl_inspection_plan, usl_inspection_plan,",
+    # The table stores the alert (reaction) limits in thousandths of the unit of the values (3 decimals): back to
+    # the unit of the values, as the tolerance (client feedback: UCL at the wrong order of magnitude).
+    "    limit_min_alert * 1000 AS limit_min_alert, limit_max_alert * 1000 AS limit_max_alert,",
+    "    NULLIF(trim(procedure_reference), '') AS process_name,",
     f"    {PART_SQL} AS part_name,",
     "    NULLIF(trim(reason_for_inspection), '') AS reason,",
     "    CAST(date_trunc('MONTH', posting_date) AS DATE) AS month_start,",
@@ -98,6 +101,7 @@ SQL_LINES = [
     "  NULLIF(trim(bmm_machine), '') AS `Press`,",
     "  kpc AS `KPC`,",
     "  key_kpc AS `Key KPC Code`,",
+    "  process_name AS `Process Name`,",
     "  CASE WHEN characteristic_result = 'control limit violated' THEN 1 ELSE 0 END AS `RL Violation`,",
     # Detail of a reaction-limit violation, for the details page. Empty on the other ~99 % of the rows,
     # so these columns cost almost nothing in the model.
@@ -146,6 +150,7 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
     ("Press", "string", "type text", False, None),
     ("KPC", "string", "type text", False, None),
     ("Key KPC Code", "int64", "Int64.Type", True, "0"),
+    ("Process Name", "string", "type text", False, None),
     ("RL Violation", "int64", "Int64.Type", True, "0"),
     ("RL Time", "dateTime", "type datetime", False, "dd/MM/yyyy HH:mm"),
     ("RL Value", "double", "type number", False, "0.####"),
@@ -170,10 +175,14 @@ COLUMNS = [  # (name, TMDL dataType, M type, hidden, format)
 CPK_SUMS = "Filled on one row per characteristic, inspection reason and day (its last measurement), empty elsewhere."
 RL_DETAIL = "Only filled for values outside the reaction limits (RL Violation = 1)."
 COLUMN_INFO = {  # name: (display folder, description)
+    "Process Name": (None, "Name of the process (test), from procedure_reference: the More filters list of the "
+                           "process names, for users who do not know the test numbers."),
     "RL Time": ("Reaction limit details", "Date and time of the measurement. " + RL_DETAIL),
     "RL Value": ("Reaction limit details", "Measured value. " + RL_DETAIL),
-    "RL Low Limit": ("Reaction limit details", "Lower reaction (alert) limit. " + RL_DETAIL),
-    "RL High Limit": ("Reaction limit details", "Upper reaction (alert) limit. " + RL_DETAIL),
+    "RL Low Limit": ("Reaction limit details", "Lower reaction (alert) limit, in the unit of the values (the table "
+                                               "stores thousandths). " + RL_DETAIL),
+    "RL High Limit": ("Reaction limit details", "Upper reaction (alert) limit, in the unit of the values (the table "
+                                                "stores thousandths). " + RL_DETAIL),
     "RL LSL": ("Reaction limit details", "Lower specification limit of the inspection plan. " + RL_DETAIL),
     "RL USL": ("Reaction limit details", "Upper specification limit of the inspection plan. " + RL_DETAIL),
     "Cpk Group": ("Cpk sums", "Key of the plant, part, test and characteristic: one Cpk per group. " + CPK_SUMS),

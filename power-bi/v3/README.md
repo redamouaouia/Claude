@@ -272,6 +272,25 @@ s'applique partout.
 `update_layout_r.py` applique ces changements à un rapport Relief (`.pbix` ou `.pbit`, modèle et données gardés)
 après le rendu des fonds Relief (étape 11) : `out/Plant visual management dashboard V18.pbix` depuis la V17.
 
+## V19 : retours client du 26-27/11 (filtres, limites du Trend chart)
+
+1. **More filters montre sa sélection** : un badge orange à droite du bouton *More filters* donne le nombre de ses
+   filtres qui ont une sélection ; rien quand aucun (mesures `filters_model.py`, un jeu par panneau).
+2. **Clear filters vide aussi More filters** : le bouton « Clear all slicers » de Power BI ignore les segments masqués,
+   et ceux du panneau le sont tant qu'il est fermé. Chaque filtre qu'une page n'affiche pas y a une copie visible de
+   4 px, dans le coin en haut à gauche, à la couleur de la page (même groupe de synchronisation) : Clear filters la
+   vide et la synchronisation vide les segments masqués. Clear filters passe aussi au-dessus du panneau et de son voile,
+   qui prenait le clic quand le panneau était ouvert. Les copies masquées de la V15 sont remplacées par ces copies.
+3. **Noms des process** : nouveau filtre *Process name* (colonne `procedure_reference`, `Quality Tracker[Process Name]`)
+   dans le panneau More filters de chaque page.
+4. **Limites UCL / LCL** : la table stocke les limites d'alerte (`limit_min_alert`, `limit_max_alert`) en millièmes de
+   l'unité des valeurs, avec 3 décimales (rapport médian UCL / USL de 0,001 sur les données de novembre). La requête
+   les multiplie par 1 000 : Trend chart et *Reaction limit details* sont à la bonne échelle. Précision : l'unité près,
+   à corriger dans la source (et retirer alors ce facteur).
+
+`update_filters_v19.py` part du `.pbix` Relief du client ; le modèle reçoit la colonne et les mesures, la sortie est un
+modèle `.pbit` : `out/Plant visual management dashboard V19.pbit`.
+
 ## Logo
 
 La pastille en haut du rail contient le symbole OP en blanc, entre deux pointillés de limites (USL / LSL). Le logo
@@ -370,6 +389,11 @@ complet, en blanc, ouvre la ligne au-dessus du titre. Le logo n'est pas stocké 
     Relief (étape 11) :
     ```bash
     PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_layout_r.py "<V16.pbix>"
+    ```
+
+15. Retours du 26-27/11 (V19), sur le `.pbix` Relief, après le rendu des fonds Relief (étape 11) :
+    ```bash
+    PBI_VISUAL_SCHEMA_DIR=<node_modules>/@microsoft/powerbi-core-visual-schema/data python update_filters_v19.py "<Relief.pbix>" --range 2026-11-01 2026-12-01
     ```
 
 `restyle.py` vérifie chaque propriété de mise en forme écrite contre le catalogue officiel des visuels Power BI
