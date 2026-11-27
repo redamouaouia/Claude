@@ -1,22 +1,22 @@
-"""Plant visual management dashboard V19: client feedback of 26-27/11/2026 on the filters and the trend chart.
+"""Plant visual management dashboard V20: client feedback of 26-27/11/2026 on the filters and the trend chart.
 
-Usage:  python update_filters_v19.py <Relief .pbix saved by Power BI Desktop> [settings.json] [--range START END]
+Usage:  python update_filters.py <Relief .pbix saved by Power BI Desktop> [settings.json] [--range START END]
 
-1. More filters shows its selection: a badge at the right of the More filters button, with the number of filters of
-   the panel that have a selection (Fail orange); nothing when none (measures of filters_model.py).
+1. More filters shows its selection: its button keeps its design and gets an orange outline when a filter of its panel
+   has a selection (measures of filters_model.py).
 2. Clear filters clears the More filters selection: Power BI's "Clear all slicers" skips hidden slicers, and the panel
    slicers are hidden while the panel is closed. Every filter that a page does not show has a visible copy there
    (same sync group), 4 px square in the top left corner and in the colour of the page: Clear filters clears it and
    the sync clears the hidden slicers. Clear filters is also above the panel and its overlay, which took the click
    while the panel was open. (The hidden copies of V15 are replaced by these.)
-3. Process names: a new filter, Process name (procedure_reference), in the More filters panel of every page.
+3. Process names: Process name (procedure_reference) is the second level of the Test filter, under each test number,
+   on every page (the Test filters are synced: they all get it).
 4. Trend chart: the table stores the alert limits in thousandths of the unit of the values; the query brings them back
    to that unit (build_template.py), for UCL / LCL and the limits of Reaction limit details.
 Page backgrounds come from out/bg_r_*.png (render them first: README). The model gets the column Process Name and the
-measures of the badge, so the output is a template: out/Plant visual management dashboard V19.pbit.
+measures of the outline, so the output is a template: out/Plant visual management dashboard V20.pbit.
 """
 import argparse
-import copy
 import json
 import pathlib
 import sys
@@ -37,11 +37,11 @@ from restyle import B, C, I, N, P, S, SEL  # noqa: E402
 
 bt = pm.bt
 T = bt.T
-OUT_NAME = "Plant visual management dashboard V19"
+OUT_NAME = "Plant visual management dashboard V20"
 ANALYSIS = ("overview", "chars", "rl", "cpk", "trend", "rl_details", "fails")
 TINY = (2, 2, 4, 4)  # visible copies of the filters a page does not show
 PAGE_COLOUR = "#F2F5F9"  # the page background in the top left corner
-PROCESS = ("Process Name", "Process name")  # column, name shown
+PROCESS = ("Process Name", "Process name")  # column, name shown: second level of Test
 
 
 def visuals(defs, pid):
@@ -62,42 +62,18 @@ def bookmarks_of(defs, pid):
             and b["explorationState"].get("activeSection") == pid]
 
 
-def add_process_filter(defs, pid):
-    """Process name under the slicers of the More filters panel; the buttons of the panel move down."""
-    vis = visuals(defs, pid)
-    panel = sorted([v for v in vis if AD.is_panel(v) and v["visual"]["visualType"] == "slicer"],
-                   key=lambda v: v["position"]["y"])
-    if not panel:
-        return None
-    first, last = panel[0], panel[-1]
-    step = panel[1]["position"]["y"] - first["position"]["y"] if len(panel) > 1 else 62
-    below = last["position"]["y"] + last["position"]["height"]
-    for v in vis:  # Reset, Close (look and button) under the slicers
-        p = v["position"]
-        if AD.is_panel(v) and p["x"] >= 980 and p["y"] >= below and p["height"] <= 40:
-            p["y"] = round(p["y"] + step, 1)
-    new = A.clone(first)
+def test_levels(defs):
+    """Process name as the second level of every Test filter (synced filters keep the same fields)."""
     column, shown = PROCESS
-    proj = new["visual"]["query"]["queryState"]["Values"]["projections"][0]
-    proj["field"]["Column"]["Expression"]["SourceRef"]["Entity"] = T
-    proj["field"]["Column"]["Property"] = column
-    proj.update(queryRef=f"{T}.{column}", nativeQueryRef=shown, displayName=shown)
-    for s in new["visual"]["query"].get("sortDefinition", {}).get("sort", []):
-        s["field"]["Column"]["Property"] = column
-    for g in new["visual"]["objects"].get("general", []):  # no selection of the slicer it was copied from
-        for key in ("filter", "selfFilter"):
-            g["properties"].pop(key, None)
-    new["visual"]["syncGroup"] = {"groupName": shown, "fieldChanges": True, "filterChanges": True}
-    new["position"]["y"] = round(last["position"]["y"] + step, 1)
-    new["position"]["z"] = new["position"]["tabOrder"] = max(v["position"]["z"] for v in panel) + 10
-    defs[f"pages/{pid}/visuals/{new['name']}/visual.json"] = new
-    for b in bookmarks_of(defs, pid):  # More filters open / closed show and hide it with the panel
-        targets = b.get("options", {}).get("targetVisualNames", [])
-        if first["name"] in targets:
-            targets.append(new["name"])
-            sec = b["explorationState"]["sections"][pid]["visualContainers"]
-            sec[new["name"]] = copy.deepcopy(sec[first["name"]])
-    return new
+    n = 0
+    for k, v in defs.items():
+        if "/visuals/" in k and is_slicer(v) and slicer_field(v) == (T, "Test"):
+            proj = v["visual"]["query"]["queryState"]["Values"]["projections"]
+            level = dict(proj[0], field={"Column": {"Expression": {"SourceRef": {"Entity": T}}, "Property": column}},
+                         queryRef=f"{T}.{column}", nativeQueryRef=shown, displayName=shown)
+            proj.append(level)
+            n += 1
+    return n
 
 
 def tiny_copy(template):
@@ -156,36 +132,16 @@ def clear_on_top(defs, pid):
     return n
 
 
-def badge(defs, pid, key):
-    """Badge of the More filters button: number of its filters with a selection (measures of filters_model.py)."""
-    vis = visuals(defs, pid)
+def more_outline(defs, pid, key):
+    """The More filters button keeps its design; orange outline when a filter of its panel has a selection."""
     opens = {b["name"] for b in bookmarks_of(defs, pid) if b["displayName"].endswith("More filters open")}
-    more = [v for v in vis if R.link_of(v).get("bookmark") in opens and 70 <= v["position"]["y"] < 140]
+    more = [v for v in visuals(defs, pid) if R.link_of(v).get("bookmark") in opens and 70 <= v["position"]["y"] < 140]
     if len(more) != 1:
         sys.exit(f"page {key}: {len(more)} More filters buttons (one expected)")
-    hot = more[0]
-    b = A.clone(hot)
-    p = hot["position"]
-    A.place(b, *DR.more_badge_rect(p["x"], p["width"], p["y"], p["height"]))
-    b["visual"]["visualContainerObjects"]["visualLink"] = [P(show=B(False))]
-    k = fm.set_of(key)
-    b["visual"]["objects"] = {
-        "icon": [SEL({"shapeType": S("blank")}, R.DEFAULT)],
-        "text": [SEL({"show": B(True), "text": R.measure_expr(f"More Filters Badge {k}"), "fontColor": C(R.WHITE),
-                      "fontSize": N(8), "fontFamily": S("Segoe UI Semibold"), "horizontalAlignment": S("center"),
-                      "verticalAlignment": S("middle"), "topMargin": I(0), "bottomMargin": I(0), "leftMargin": I(0),
-                      "rightMargin": I(0)}, R.DEFAULT)],
-        "fill": [SEL({"show": B(True), "fillColor": {"solid": {"color": R.measure_expr(f"More Filters Badge Color {k}")}},
-                      "transparency": N(0)}, R.DEFAULT)],
-        "outline": [SEL({"show": B(False)}, R.DEFAULT)],
-        "shape": [SEL({"tileShape": S("rectangleRounded"), "roundEdge": I(9)}, R.DEFAULT)],
-    }
-    used = {v["position"]["z"] for v in vis}
-    z = p["z"] - 1
-    while z in used:
-        z -= 1
-    b["position"]["z"] = b["position"]["tabOrder"] = z  # under the (transparent) button, which keeps the click
-    defs[f"pages/{pid}/visuals/{b['name']}/visual.json"] = b
+    o = more[0]["visual"]["objects"]
+    o["outline"] = [SEL({"show": B(True), "weight": N(1.5), "transparency": N(0), "lineColor": {
+        "solid": {"color": R.measure_expr(f"More Filters Outline {fm.set_of(key)}")}}}, R.DEFAULT)]
+    o["shape"] = [SEL({"tileShape": S("rectangleRounded"), "roundEdge": I(15)}, R.DEFAULT)]
 
 
 def main():
@@ -199,15 +155,17 @@ def main():
     defs = pkg.definitions(zin)
     meta = defs["pages/pages.json"]
     keys = {PF.TITLES[defs[f"pages/{p}/page.json"]["displayName"]]: p for p in meta["pageOrder"]}
-    if any(slicer_field(v)[1] == PROCESS[0] for k, v in defs.items() if "/visuals/" in k and is_slicer(v)):
-        sys.exit("this report already has the Process name filter")
+    if PROCESS[0] in json.dumps([v["visual"].get("query") for k, v in defs.items() if "/visuals/" in k]):
+        sys.exit("this report already has the process names")
 
+    print(f"Test filters with the process name as second level: {test_levels(defs)}")
     for key in ANALYSIS:
         pid = keys[key]
-        new = add_process_filter(defs, pid)
-        if new is not None:
-            badge(defs, pid, key)
-        print(f"{key:11s} process filter: {'yes' if new else 'no panel'}; Clear filters on top: {clear_on_top(defs, pid)}")
+        panel = any(AD.is_panel(v) and v["visual"]["visualType"] == "slicer" for v in visuals(defs, pid))
+        if panel:
+            more_outline(defs, pid, key)
+        print(f"{key:11s} More filters outline: {'yes' if panel else 'no panel'}; "
+              f"Clear filters on top: {clear_on_top(defs, pid)}")
     for key, groups in visible_copies(defs, keys).items():
         print(f"{key:11s} visible copies: {', '.join(groups)}")
     images, old = AR.set_backgrounds(defs, keys)
@@ -221,7 +179,7 @@ def main():
     settings = json.loads(pathlib.Path(args.settings).read_text())
     if args.range:
         settings["range_start"], settings["range_end"] = args.range
-    work = HERE / "out" / "v19"
+    work = HERE / "out" / "v20"
     work.mkdir(parents=True, exist_ok=True)
     model_json = bt.model_schema(pm.write_model(work, settings), work / "DataModelSchema.json")
     pkg.check_fields(defs, model_json)

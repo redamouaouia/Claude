@@ -73,11 +73,6 @@ def slicer_slots(page):
     return out
 
 
-def more_badge_rect(x, w, y=FILTER_Y, h=FILTER_H):
-    """Badge at the right end of the More filters button: number of its filters with a selection."""
-    return (round(x + w - 27, 1), round(y + (h - 17) / 2, 1), 17, 17)
-
-
 def slicer_rect(x, w):
     """The slicer visual inside its well (under the name)."""
     return (x + 5, FILTER_Y + SLICER_TOP, w - 10, FILTER_H - SLICER_TOP - 1)
@@ -307,10 +302,9 @@ def page_html(page):
         for (x, w), (_, label, _) in zip(slots, spec["slicers"]):
             boxes += (f'<div class="well" style="left:{x}px;top:{FILTER_Y}px;width:{w}px;height:{FILTER_H}px">'
                       f'<b>{html.escape(label)}</b></div>')
-        mx, mw = slots[-1]  # the badge of the selected filters is a visual (more_badge_rect)
-        boxes += (f'<div class="raised" style="left:{mx}px;top:{FILTER_Y}px;width:{mw}px;height:{FILTER_H}px;'
-                  f'justify-content:flex-start;padding-left:15px">'
-                  f'{D.icon("clear", 14, NAVY, 1.7)}<span>More filters</span></div>')
+        mx, mw = slots[-1]  # its button gets an orange outline when a filter of the panel has a selection
+        boxes += (f'<div class="raised" style="left:{mx}px;top:{FILTER_Y}px;width:{mw}px;height:{FILTER_H}px">'
+                  f'{D.icon("clear", 14, NAVY, 1.7)}<span>More filters</span><i>{spec.get("more_count", 2)}</i></div>')
     if spec.get("context"):
         x, y, w, h = CONTEXT
         boxes += (f'<div class="well" style="left:{x}px;top:{y}px;width:{w}px;height:{h}px">'
