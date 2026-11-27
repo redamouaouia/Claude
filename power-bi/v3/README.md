@@ -258,17 +258,19 @@ s'applique partout.
 `update_home_r.py` replace les boutons des tuiles et remplace le fond de la page d'accueil d'un rapport Relief
 (`.pbix` ou `.pbit`) ; le reste est gardé. Sortie : `out/Plant visual management dashboard V16.pbit` depuis la V15.
 
-## V17 : Overview avec les chiffres clés en haut, filtres centrés
+## V17 / V18 : Overview avec les chiffres clés en haut, filtres centrés
 
 - **Overview** : *Pass rate*, *Failed inspections*, *Fail rate* et *Gap to target* forment la première rangée (même
   style : icône 3D, nom, chiffre, ligne sous le chiffre). En dessous : *Cumulative pass %* et la tuile « Where do
   inspections fail? » à gauche ; la jauge (titrée *Pass rate vs 95 % target*, avec la période choisie) et le tableau
   des résultats avec son sélecteur Part / Test à droite.
-- **Rangée des filtres** (toutes les pages) : champs plus hauts (54 px), segments de 36 px sous leur nom. La valeur des
-  listes est centrée et le filtre de dates montre ses deux dates (à 25 px de haut, Power BI n'affichait qu'une icône).
+- **Rangée des filtres** (toutes les pages) : V17 avait des champs plus hauts (54 px) ; à la demande du client, V18
+  revient aux champs de 44 px. Les segments y font 30 px (au lieu de 25) sous leur nom, avec l'option *responsive*
+  désactivée : Power BI ne les replie plus en icône d'entonnoir quand ils sont bas. La valeur des listes est centrée,
+  le filtre de dates montre ses deux dates (texte en 9 pt).
 
-`update_layout_r.py` applique ces deux changements à un rapport Relief (`.pbix` ou `.pbit`, modèle et données gardés)
-après le rendu des fonds Relief (étape 11) : `out/Plant visual management dashboard V17.pbix`.
+`update_layout_r.py` applique ces changements à un rapport Relief (`.pbix` ou `.pbit`, modèle et données gardés)
+après le rendu des fonds Relief (étape 11) : `out/Plant visual management dashboard V18.pbix` depuis la V17.
 
 ## Logo
 

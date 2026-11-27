@@ -25,8 +25,8 @@ CANVAS = "#E9EEF4"
 RAIL_BOX = (14, 14, 152, 692)  # floating navy rail
 X0, X1 = 186, 1264
 CONTENT_Y0, CONTENT_Y1 = 142, 706
-FILTER_Y, FILTER_H = 78, 54  # V17: taller wells, so that the date range shows its two dates
-SLICER_TOP = 16  # the slicer visual (36 px high) sits under the name written in its well
+FILTER_Y, FILTER_H = 84, 44
+SLICER_TOP = 13  # the slicer visual (30 px high, responsive off: never folded into an icon) sits under its name
 PERIOD = (964, 22, 300, 36)  # inset track; the button slicer inside, 3 px in
 NAV = {key: (26, 118 + i * 46, 128, 38) for i, (_, key) in enumerate(D.NAV)}
 HOME_LINK = (26, 28, 128, 74)  # logo and "‹ Home"
@@ -75,7 +75,7 @@ def slicer_slots(page):
 
 def slicer_rect(x, w):
     """The slicer visual inside its well (under the name)."""
-    return (x + 5, FILTER_Y + SLICER_TOP, w - 10, FILTER_H - SLICER_TOP - 3)
+    return (x + 5, FILTER_Y + SLICER_TOP, w - 10, FILTER_H - SLICER_TOP - 1)
 
 
 # Overview (V17): the four key figures in the first row; below, the cumulative pass % and the failure tile on the
@@ -199,7 +199,7 @@ body {{ position: relative; font-family: Inter, "Segoe UI", sans-serif; color: {
 .q {{ position: absolute; top: 56px; font-size: 11.5px; color: #4D5F7C; }}
 .well {{ position: absolute; border-radius: 15px; background: {WELL};
   box-shadow: inset 0 2px 5px rgba(16,40,80,.13), inset 0 -1px 0 rgba(255,255,255,.95); }}
-.well b {{ position: absolute; left: 13px; top: 7px; font-size: 7.6px; font-weight: 600; letter-spacing: .11em;
+.well b {{ position: absolute; left: 13px; top: 5px; font-size: 7.6px; font-weight: 600; letter-spacing: .11em;
            text-transform: uppercase; color: {MUTED2}; white-space: nowrap; }}
 .raised {{ position: absolute; border-radius: 15px; display: flex; align-items: center; justify-content: center; gap: 7px;
   background: linear-gradient(180deg, #FFFFFF, #F3F6FA); color: {NAVY}; font: 600 10.5px Inter, sans-serif;

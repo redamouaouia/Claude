@@ -1,12 +1,13 @@
-"""Plant visual management dashboard V17: Overview with the key figures on top, filters centred in their wells.
+"""Plant visual management dashboard V17 / V18: Overview with the key figures on top, filters centred in their wells.
 
 Usage:  python update_layout_r.py <Relief .pbix (or .pbit)> [<output>]
 
 - Overview: Pass rate, Failed inspections, Fail rate and Gap to target in the first row (key figures); below, the
   cumulative pass % and the failure tile on the left, the gauge (titled, with the period chosen) and the results table
   with its Part / Test switch on the right.
-- Filter row of every page: taller wells (54 px), slicers 36 px high under their name, so that the value of a list is
-  centred and the date range shows its two dates (25 px were too few: Power BI showed only a filter icon).
+- Filter row of every page (V18: the wells keep their size, 44 px): slicers 30 px high under their name, responsive
+  off, so that the value of a list is centred and the date range shows its two dates (at 25 px, responsive, Power BI
+  folded it into a filter icon).
 Render the Relief backgrounds first (README, step 11): every page background is replaced. Model, data and every other
 setting are kept: the output has the type of the input (default: out/Plant visual management dashboard V17.<ext>).
 """

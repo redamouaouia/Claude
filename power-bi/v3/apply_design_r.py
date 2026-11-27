@@ -137,6 +137,7 @@ def redesign_page(defs, pid, key, page_keys):
                 i = AD.nearest(p["x"], [x for x, _ in old_slots[:-1]])
                 A.place(v, *DR.slicer_rect(*new_slots[i]))
                 style_slicer(v)
+                no_fold(v)
             elif link.get("type") == "PageNavigation":  # ‹ Overview, before the title of Failure breakdown
                 A.place(v, *DR.BACK_LINK)
                 hover(v, DR.NAVY, 94)
@@ -215,8 +216,17 @@ def arrange_overview(defs, pid, page_keys):
         A.place(v, *(left if v["position"]["x"] < middle else right))
 
 
+def no_fold(v):
+    """A slicer that is never folded into a filter icon when it is low (responsive off); dates in 9 pt."""
+    o = v["visual"].setdefault("objects", {})
+    general = o.setdefault("general", [{"properties": {}}])
+    general[0].setdefault("properties", {})["responsive"] = B(False)
+    for e in o.get("date", []):
+        e["properties"]["textSize"] = N(9)
+
+
 def place_filter_row(defs, pid, key):
-    """V17: slicers, More filters / Back and the details card into the taller wells of the filter row."""
+    """Slicers (never folded into an icon), More filters / Back and the details card into the wells of the filter row."""
     slots = DR.slicer_slots(key) if D.PAGES[key]["slicers"] else []
     n = 0
     for v in [v for k, v in defs.items() if k.startswith(f"pages/{pid}/visuals/")]:
@@ -226,6 +236,7 @@ def place_filter_row(defs, pid, key):
         if vt == "slicer":
             i = AD.nearest(p["x"], [x for x, _ in slots[:-1]])
             A.place(v, *DR.slicer_rect(*slots[i]))
+            no_fold(v)
         elif vt == "actionButton" and p["x"] >= DR.X1 - DR.MORE_W - 2:
             A.place(v, *((slots[-1][0], DR.FILTER_Y, slots[-1][1], DR.FILTER_H) if slots else DR.BACK))
         elif vt == "card" and key == "rl_details":
